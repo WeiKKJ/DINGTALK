@@ -1,0 +1,23 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<abapGit version="v1.0.0" serializer="LCL_OBJECT_DTEL" serializer_version="v1.0.0">
+ <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+  <asx:values>
+   <DD04V>
+    <ROLLNAME>ZE_EXPIRES_IN</ROLLNAME>
+    <DDLANGUAGE>1</DDLANGUAGE>
+    <DOMNAME>INT2</DOMNAME>
+    <HEADLEN>21</HEADLEN>
+    <SCRLEN1>06</SCRLEN1>
+    <SCRLEN2>20</SCRLEN2>
+    <SCRLEN3>21</SCRLEN3>
+    <DDTEXT>access_token的过期时间 单位秒</DDTEXT>
+    <REPTEXT>access_token的过期时间 单位秒</REPTEXT>
+    <SCRTEXT_S>过期时间 秒</SCRTEXT_S>
+    <SCRTEXT_M>access_token的过期时间 秒</SCRTEXT_M>
+    <SCRTEXT_L>access_token的过期时间 单位秒</SCRTEXT_L>
+    <DTELMASTER>1</DTELMASTER>
+    <REFKIND>D</REFKIND>
+   </DD04V>
+  </asx:values>
+ </asx:abap>
+</abapGit>

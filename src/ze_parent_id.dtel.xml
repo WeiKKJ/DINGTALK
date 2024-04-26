@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<abapGit version="v1.0.0" serializer="LCL_OBJECT_DTEL" serializer_version="v1.0.0">
+ <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+  <asx:values>
+   <DD04V>
+    <ROLLNAME>ZE_PARENT_ID</ROLLNAME>
+    <DDLANGUAGE>1</DDLANGUAGE>
+    <HEADLEN>05</HEADLEN>
+    <SCRLEN1>05</SCRLEN1>
+    <SCRLEN2>05</SCRLEN2>
+    <SCRLEN3>05</SCRLEN3>
+    <DDTEXT>父部门ID</DDTEXT>
+    <REPTEXT>父部门ID</REPTEXT>
+    <SCRTEXT_S>父部门ID</SCRTEXT_S>
+    <SCRTEXT_M>父部门ID</SCRTEXT_M>
+    <SCRTEXT_L>父部门ID</SCRTEXT_L>
+    <DTELMASTER>1</DTELMASTER>
+    <DATATYPE>INT8</DATATYPE>
+    <LENG>000019</LENG>
+    <OUTPUTLEN>000020</OUTPUTLEN>
+   </DD04V>
+  </asx:values>
+ </asx:abap>
+</abapGit>

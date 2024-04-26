@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<abapGit version="v1.0.0" serializer="LCL_OBJECT_DTEL" serializer_version="v1.0.0">
+ <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+  <asx:values>
+   <DD04V>
+    <ROLLNAME>ZE_APPKEY</ROLLNAME>
+    <DDLANGUAGE>1</DDLANGUAGE>
+    <HEADLEN>10</HEADLEN>
+    <SCRLEN1>10</SCRLEN1>
+    <SCRLEN2>10</SCRLEN2>
+    <SCRLEN3>10</SCRLEN3>
+    <DDTEXT>应用的唯一标识key</DDTEXT>
+    <REPTEXT>应用的唯一标识key</REPTEXT>
+    <SCRTEXT_S>应用的唯一标识key</SCRTEXT_S>
+    <SCRTEXT_M>应用的唯一标识key</SCRTEXT_M>
+    <SCRTEXT_L>应用的唯一标识key</SCRTEXT_L>
+    <DTELMASTER>1</DTELMASTER>
+    <DATATYPE>STRG</DATATYPE>
+   </DD04V>
+  </asx:values>
+ </asx:abap>
+</abapGit>
