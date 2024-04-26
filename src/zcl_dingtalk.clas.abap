@@ -11,6 +11,10 @@ public section.
   constants GETUSER_URL type STRING value `https://oapi.dingtalk.com/topapi/v2/user/get` ##NO_TEXT.
   data:
     lt_ztddlistsub TYPE TABLE OF ztddlistsub .
+  data:
+    lt_userid_list TYPE TABLE OF ztdduser-userid .
+  data:
+    lt_ztdduser  TYPE TABLE OF ztdduser .
 
   class-methods CREATE_HTTP_CLIENT
     importing
@@ -27,16 +31,17 @@ public section.
       value(OUTPUT) type STRING
       value(RTMSG) type STRING
       value(STATUS) type I .
-  PROTECTED SECTION.
-private section.
-
-  constants GETUSERLIST_URL type STRING value `https://oapi.dingtalk.com/topapi/user/listid` ##NO_TEXT.
-
   methods POST2DDROBOT .
   methods POST2CORPCONVERSATION .
   methods GET_USERINFO
     importing
-      !APPID type ZE_APPID .
+      !APPID type ZE_APPID
+      !LANGUAGE type CHAR5 default 'zh_CN'
+      !USERID type ZE_USERID
+    exporting
+      value(RTYPE) type BAPI_MTYPE
+      value(RTMSG) type BAPI_MSG
+      value(GT_ZTDDUSER) like LT_ZTDDUSER .
   methods GET_DEPT
     importing
       !APPID type ZE_APPID
@@ -52,14 +57,20 @@ private section.
       !DEPT_ID type ZE_DEPT_ID
     exporting
       value(RTYPE) type BAPI_MTYPE
-      value(RTMSG) type BAPI_MSG .
-  methods GETTOKEN
-    importing
-      !APPID type ZE_APPID
-    exporting
-      !RTYPE type BAPI_MTYPE
-      !RTMSG type BAPI_MSG
-      value(ACCESS_TOKEN) type ZE_ACCESS_TOKEN .
+      value(RTMSG) type BAPI_MSG
+      value(GT_USERLIST) like LT_USERID_LIST .
+  PROTECTED SECTION.
+  PRIVATE SECTION.
+
+    CONSTANTS getuserlist_url TYPE string VALUE `https://oapi.dingtalk.com/topapi/user/listid` ##NO_TEXT.
+
+    METHODS gettoken
+      IMPORTING
+        !appid              TYPE ze_appid
+      EXPORTING
+        !rtype              TYPE bapi_mtype
+        !rtmsg              TYPE bapi_msg
+        VALUE(access_token) TYPE ze_access_token .
 ENDCLASS.
 
 
@@ -343,7 +354,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
     " 传入json结构  26.04.2024 11:06:12 by kkw
     TYPES: BEGIN OF t_JSON1_in,
              language TYPE string,
-             dept_id  TYPE i,
+             dept_id  TYPE ztddlistsub-dept_id,
            END OF t_JSON1_in.
     DATA:wa_in   TYPE t_JSON1_in,
          json_in TYPE string.
@@ -351,10 +362,10 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
     TYPES: BEGIN OF t_RESULT2,
              auto_add_user     TYPE abap_bool,
              create_dept_group TYPE abap_bool,
-             dept_id           TYPE i,
+             dept_id           TYPE ztddlistsub-dept_id,
              ext               TYPE string,
              name              TYPE string,
-             parent_id         TYPE i,
+             parent_id         TYPE ztddlistsub-parent_id,
            END OF t_RESULT2.
     TYPES: tt_RESULT2 TYPE STANDARD TABLE OF t_RESULT2 WITH DEFAULT KEY.
     TYPES: BEGIN OF t_JSON1,
@@ -456,18 +467,239 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
   ENDMETHOD.
 
 
-  method GET_USERINFO.
-  endmethod.
+  METHOD get_userinfo.
+    " 传入json结构
+    TYPES: BEGIN OF t_JSON1_in,
+             language TYPE string,
+             userid   TYPE ztdduser-userid,
+           END OF t_JSON1_in.
+    DATA:wa_in   TYPE t_JSON1_in,
+         json_in TYPE string.
+    " 返回json结构
+    TYPES: BEGIN OF t_UNION_EMP_MAP_LIST6,
+             userid  TYPE string,
+             corp_id TYPE string,
+           END OF t_UNION_EMP_MAP_LIST6.
+    TYPES: t_DEPT_ID_LIST4 TYPE ztdduser-dept_id.
+    TYPES: BEGIN OF t_ROLE_LIST2,
+             group_name TYPE string,
+             name       TYPE string,
+             id         TYPE string,
+           END OF t_ROLE_LIST2.
+    TYPES: BEGIN OF t_UNION_EMP_EXT7,
+             union_emp_map_list TYPE t_UNION_EMP_MAP_LIST6,
+             userid             TYPE string,
+             corp_id            TYPE string,
+           END OF t_UNION_EMP_EXT7.
+    TYPES: BEGIN OF t_LEADER_IN_DEPT5,
+             leader  TYPE string,
+             dept_id TYPE string,
+           END OF t_LEADER_IN_DEPT5.
+    TYPES: BEGIN OF t_DEPT_ORDER_LIST3,
+             dept_id TYPE string,
+             order   TYPE string,
+           END OF t_DEPT_ORDER_LIST3.
+    TYPES: tt_DEPT_ID_LIST4 TYPE STANDARD TABLE OF t_DEPT_ID_LIST4 WITH DEFAULT KEY.
+    TYPES: BEGIN OF t_RESULT8,
+             extension         TYPE string,
+             unionid           TYPE string,
+             boss              TYPE string,
+             role_list         TYPE t_ROLE_LIST2,
+             exclusive_account TYPE abap_bool,
+             manager_userid    TYPE string,
+             admin             TYPE string,
+             remark            TYPE string,
+             title             TYPE string,
+             hired_date        TYPE string,
+             userid            TYPE string,
+             work_place        TYPE string,
+             dept_order_list   TYPE t_DEPT_ORDER_LIST3,
+             real_authed       TYPE string,
+             dept_id_list      TYPE tt_DEPT_ID_LIST4,
+             job_number        TYPE string,
+             email             TYPE string,
+             leader_in_dept    TYPE t_LEADER_IN_DEPT5,
+             mobile            TYPE string,
+             active            TYPE string,
+             org_email         TYPE string,
+             telephone         TYPE string,
+             avatar            TYPE string,
+             hide_mobile       TYPE string,
+             senior            TYPE string,
+             name              TYPE string,
+             union_emp_ext     TYPE t_UNION_EMP_EXT7,
+             state_code        TYPE string,
+           END OF t_RESULT8.
+    TYPES: BEGIN OF t_JSON1,
+             errcode      TYPE string,
+             errcode_desc TYPE string,
+             result       TYPE t_RESULT8,
+             errmsg       TYPE string,
+           END OF t_JSON1.
+    DATA:wa_userinfo TYPE t_JSON1.
+    DATA:url     TYPE string,
+         out_put TYPE string,
+         otmsg   TYPE string,
+         status  TYPE i.
+    DATA:access_token TYPE ztddconfig-access_token.
+
+    CLEAR:rtype,rtmsg.
+*    获取token
+    CALL METHOD me->gettoken
+      EXPORTING
+        appid        = appid
+      IMPORTING
+        rtype        = rtype
+        rtmsg        = rtmsg
+        access_token = access_token.
+    IF rtype NE 'S'.
+      RETURN.
+    ENDIF.
+    CLEAR:rtype,rtmsg,json_in,wa_in.
+    url = |{ getuser_url }?access_token={ access_token }|.
+    wa_in-language = language.
+    wa_in-userid = userid.
+    json_in = /ui2/cl_json=>serialize( data = wa_in  compress = abap_false pretty_name = /ui2/cl_json=>pretty_mode-low_case ).
+
+    CALL METHOD zcl_dingtalk=>create_http_client
+      EXPORTING
+        input     = json_in
+        url       = url
+*       username  =
+*       password  =
+        reqmethod = 'POST'
+*       http1_1   = ABAP_TRUE
+*       proxy     =
+*       bodytype  = 'JSON'
+*       header    =
+      IMPORTING
+        output    = out_put
+        rtmsg     = otmsg
+        status    = status.
+    IF status NE 200.
+      rtype = 'E'.
+      rtmsg = |调用{ appid }获取user发生了问题:{ otmsg }，状态码:{ status }|.
+      RETURN.
+    ENDIF.
+    /ui2/cl_json=>deserialize( EXPORTING json = out_put  pretty_name = /ui2/cl_json=>pretty_mode-low_case CHANGING data = wa_userinfo ).
+    CASE wa_userinfo-errcode.
+      WHEN 33012.
+        wa_userinfo-errcode_desc = |无效的userId,请检查userId是否正确|.
+      WHEN 400002.
+        wa_userinfo-errcode_desc = |无效的参数,请确认参数是否按要求输入|.
+      WHEN -1.
+        wa_userinfo-errcode_desc = |系统繁忙,请稍后再试|.
+      WHEN OTHERS.
+        wa_userinfo-errcode_desc = wa_userinfo-errcode.
+    ENDCASE.
+    IF wa_userinfo-errcode NE 0.
+      rtype = 'E'.
+      rtmsg = |调用{ appid }获取user返回错误信息:{ wa_userinfo-errmsg }，errcode:{ wa_userinfo-errcode_desc },状态码:{ status }|.
+      RETURN.
+    ENDIF.
+    CLEAR:gt_ztdduser.
+    LOOP AT wa_userinfo-result-dept_id_list ASSIGNING FIELD-SYMBOL(<dept_id_list>).
+      INSERT INITIAL LINE INTO TABLE gt_ztdduser ASSIGNING FIELD-SYMBOL(<gt_ztdduser>).
+      <gt_ztdduser>-dept_id = <dept_id_list>.
+      <gt_ztdduser>-userid = wa_userinfo-result-userid.
+      <gt_ztdduser>-name = wa_userinfo-result-name.
+      <gt_ztdduser>-mobile = wa_userinfo-result-mobile.
+    ENDLOOP.
+    rtype = 'S'.
+    rtmsg = wa_userinfo-errmsg.
+  ENDMETHOD.
 
 
-  method GET_USERLIST.
-  endmethod.
+  METHOD get_userlist.
+    " 传入json结构
+    TYPES: BEGIN OF t_JSON1_in,
+             dept_id TYPE ztddlistsub-dept_id,
+           END OF t_JSON1_in.
+    DATA:wa_in   TYPE t_JSON1_in,
+         json_in TYPE string.
+    " 返回json结构
+    TYPES: t_USERID_LIST2 TYPE ztdduser-userid.
+    TYPES: tt_USERID_LIST2 TYPE STANDARD TABLE OF t_USERID_LIST2 WITH DEFAULT KEY.
+    TYPES: BEGIN OF t_RESULT3,
+             userid_list TYPE tt_USERID_LIST2,
+           END OF t_RESULT3.
+    TYPES: BEGIN OF t_JSON1,
+             errcode      TYPE i,
+             errcode_desc TYPE string,
+             errmsg       TYPE string,
+             result       TYPE t_RESULT3,
+             request_id   TYPE string,
+           END OF t_JSON1.
+    DATA:wa_userlist TYPE t_JSON1.
+    DATA:url     TYPE string,
+         out_put TYPE string,
+         otmsg   TYPE string,
+         status  TYPE i.
+    DATA:access_token TYPE ztddconfig-access_token.
+
+    CLEAR:rtype,rtmsg,gt_userlist.
+*    获取token
+    CALL METHOD me->gettoken
+      EXPORTING
+        appid        = appid
+      IMPORTING
+        rtype        = rtype
+        rtmsg        = rtmsg
+        access_token = access_token.
+    IF rtype NE 'S'.
+      RETURN.
+    ENDIF.
+    CLEAR:rtype,rtmsg,json_in,wa_in.
+    url = |{ getuserlist_url }?access_token={ access_token }|.
+    wa_in-dept_id = dept_id.
+    json_in = /ui2/cl_json=>serialize( data = wa_in  compress = abap_false pretty_name = /ui2/cl_json=>pretty_mode-low_case ).
+
+    CALL METHOD zcl_dingtalk=>create_http_client
+      EXPORTING
+        input     = json_in
+        url       = url
+*       username  =
+*       password  =
+        reqmethod = 'POST'
+*       http1_1   = ABAP_TRUE
+*       proxy     =
+*       bodytype  = 'JSON'
+*       header    =
+      IMPORTING
+        output    = out_put
+        rtmsg     = otmsg
+        status    = status.
+    IF status NE 200.
+      rtype = 'E'.
+      rtmsg = |调用{ appid }获取listsub发生了问题:{ otmsg }，状态码:{ status }|.
+      RETURN.
+    ENDIF.
+    /ui2/cl_json=>deserialize( EXPORTING json = out_put  pretty_name = /ui2/cl_json=>pretty_mode-low_case CHANGING data = wa_userlist ).
+    CASE wa_userlist-errcode.
+      WHEN 60003.
+        wa_userlist-errcode_desc = |未找到对应部门,请确认dept_id是否正确|.
+      WHEN 400002.
+        wa_userlist-errcode_desc = |无效的参数,请确认参数是否按要求输入|.
+      WHEN -1.
+        wa_userlist-errcode_desc = |系统繁忙,请稍后再试|.
+      WHEN OTHERS.
+        wa_userlist-errcode_desc = wa_userlist-errcode.
+    ENDCASE.
+    IF wa_userlist-errcode NE 0.
+      rtype = 'E'.
+      rtmsg = |调用{ appid }获取userlist返回错误信息:{ wa_userlist-errmsg }，errcode:{ wa_userlist-errcode_desc },状态码:{ status }|.
+      RETURN.
+    ENDIF.
+    APPEND LINES OF wa_userlist-result-userid_list TO gt_userlist.
+    rtype = 'S'.
+    rtmsg = wa_userlist-errmsg.
+  ENDMETHOD.
 
 
-  method POST2CORPCONVERSATION.
-  endmethod.
+  METHOD post2corpconversation.
+  ENDMETHOD.
 
 
-  method POST2DDROBOT.
-  endmethod.
+  METHOD post2ddrobot.
+  ENDMETHOD.
 ENDCLASS.
