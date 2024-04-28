@@ -18,6 +18,7 @@ public section.
   class-methods CREATE_HTTP_CLIENT
     importing
       value(INPUT) type STRING optional
+      value(MEDIA) type XSTRING optional
       value(URL) type STRING
       value(USERNAME) type STRING optional
       value(PASSWORD) type STRING optional
@@ -44,6 +45,8 @@ public section.
       value(USERID) type ZE_USERID
       value(TITLE) type STRING optional
       value(TEXT) type STRING optional
+      value(MEDIA_ID) type STRING optional
+      value(DURATION) type I optional
     exporting
       value(RTYPE) type BAPI_MTYPE
       value(RTMSG) type BAPI_MSG .
@@ -91,6 +94,15 @@ public section.
       value(ZTDDLISTSUB_IN) like LT_ZTDDLISTSUB
     exporting
       !ZTDDLISTSUB_OUT like LT_ZTDDLISTSUB .
+  methods UPLOAD_MEDIA
+    importing
+      value(TYPE) type ZE_MEDIA_TYPE
+      value(MEDIA) type XSTRING
+      value(HEADER) type ANY TABLE
+    exporting
+      !MEDIA_ID type STRING
+      value(RTYPE) type BAPI_MTYPE
+      value(RTMSG) type BAPI_MSG .
 protected section.
 private section.
 
@@ -101,6 +113,7 @@ private section.
   constants GET_TOKEN_URL type STRING value `https://oapi.dingtalk.com/gettoken` ##NO_TEXT.
   constants GET_USER_URL type STRING value `https://oapi.dingtalk.com/topapi/v2/user/get` ##NO_TEXT.
   constants GET_USERLIST_URL type STRING value `https://oapi.dingtalk.com/topapi/user/listid` ##NO_TEXT.
+  constants UPLOAD_MEDIA_URL type STRING value `https://oapi.dingtalk.com/media/upload` ##NO_TEXT.
 
   methods GETTOKEN
     exporting
@@ -129,14 +142,22 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
          proxy_user    TYPE string,
          proxy_passwd  TYPE string,
          http_object   TYPE REF TO if_http_client,
+         http_entity   TYPE REF TO if_http_entity, "http实体
          length        TYPE i,
          fields        TYPE tihttpnvp,
          it_ihttpnvp   TYPE TABLE OF ihttpnvp.
+    DATA:lv_content_disposition TYPE string,
+         lv_content_type        TYPE string.
+    DATA:long_filename  TYPE char255,
+         pure_filename  TYPE sdbah-actid,
+         pure_extension TYPE sdbad-funct.
     FIELD-SYMBOLS:<wa>       TYPE any,
                   <fs_name>  TYPE any,
                   <fs_value> TYPE any.
 
     CLEAR:output,length,rtmsg,result,message,status,
+    pure_filename,pure_extension,
+    lv_content_disposition,lv_content_type,
     proxy_service,proxy_host,proxy_user,proxy_passwd.
 
     length = strlen( input ).
@@ -197,9 +218,12 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
           password = password.
     ENDIF.
 
-    CASE  bodytype.
+    CASE bodytype.
       WHEN 'JSON'.
         http_object->request->set_header_field( name = 'Content-Type' value = 'application/json;charset=utf-8' ).
+      WHEN 'FORM-DATA'.
+        http_object->request->set_header_field( name = 'Content-Type' value = 'multipart/form-data' ).
+        http_entity = http_object->request->if_http_entity~add_multipart( ).
     ENDCASE.
 
 *设置头部数据
@@ -217,7 +241,74 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
       AND   <fs_value> IS NOT INITIAL.
       result = <fs_name>.
       message = <fs_value>.
-      http_object->request->set_header_field( name = result value = message ).
+      IF bodytype = 'JSON'.
+        http_object->request->set_header_field( name = result value = message ).
+*设置下 content_type
+      ELSEIF bodytype = 'FORM-DATA'.
+        SPLIT condense( replace( val  = message
+                         pcre = `\s`
+                         with = ``
+                         occ  = 0 ) ) AT `;` INTO TABLE DATA(lt_split).
+
+        LOOP AT lt_split ASSIGNING FIELD-SYMBOL(<lt_split>).
+          IF <lt_split>(8) = 'filename'.
+            long_filename = replace( val  = <lt_split>+9
+                                     pcre = `\"`
+                                     with = ``
+                                     occ  = 0 ).
+            CALL FUNCTION 'SPLIT_FILENAME'
+              EXPORTING
+                long_filename  = long_filename
+              IMPORTING
+                pure_filename  = pure_filename
+                pure_extension = pure_extension.
+            TRANSLATE pure_extension TO LOWER CASE.
+            CASE pure_extension.
+              WHEN 'rar'.
+                lv_content_type = 'application/x-rar-compressed'.
+              WHEN 'pdf'.
+                lv_content_type = 'application/pdf'.
+              WHEN 'zip'.
+                lv_content_type = 'application/zip'.
+              WHEN 'pptx'.
+                lv_content_type = 'application/vnd.openxmlformats-officedocument.presentationml.presentation'.
+              WHEN 'ppt'.
+                lv_content_type = 'application/vnd.ms-powerpoint'.
+              WHEN 'xlsx'.
+                lv_content_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'.
+              WHEN 'xls'.
+                lv_content_type = 'application/vnd.ms-excel'.
+              WHEN 'docx'.
+                lv_content_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'.
+              WHEN 'doc'.
+                lv_content_type = 'application/msword'.
+              WHEN 'mp4'.
+                lv_content_type = 'video/mp4'.
+              WHEN 'wav'.
+                lv_content_type = 'audio/wav'.
+              WHEN 'mp3'.
+                lv_content_type = 'audio/mpeg'.
+              WHEN 'amr'.
+                lv_content_type = 'audio/amr'.
+              WHEN 'bmp'.
+                lv_content_type = 'image/bmp'.
+              WHEN 'gif'.
+                lv_content_type = 'image/gif'.
+              WHEN 'jpg'.
+                lv_content_type = 'image/jpeg'.
+              WHEN 'jpg'.
+                lv_content_type = 'image/jpeg'.
+              WHEN 'png'.
+                lv_content_type = 'image/png'.
+              WHEN 'txt'.
+                lv_content_type = 'text/plain'.
+            ENDCASE.
+            http_entity->set_content_type( lv_content_type ).
+            http_entity->set_header_field( name = result value = message ).
+            length = xstrlen( media ).
+          ENDIF.
+        ENDLOOP.
+      ENDIF.
     ENDLOOP.
     CLEAR:result,message.
 
@@ -226,6 +317,12 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
       CALL METHOD http_object->request->set_cdata
         EXPORTING
           data   = input
+          offset = 0
+          length = length.
+    ELSEIF media IS NOT INITIAL.
+      CALL METHOD http_entity->set_data
+        EXPORTING
+          data   = media
           offset = 0
           length = length.
     ENDIF.
@@ -799,7 +896,13 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
         ENDIF.
         wa_in-msg-markdown-title = title.
         wa_in-msg-markdown-text = text.
-
+      WHEN 'file'.
+        wa_in-msg-file-media_id = media_id.
+      WHEN 'image'.
+        wa_in-msg-image-media_id = media_id.
+      WHEN 'voice'.
+        wa_in-msg-voice-media_id = media_id.
+        wa_in-msg-voice-duration = duration.
       WHEN OTHERS.
         rtype = 'E'.
         rtmsg = |当前版本尚未添加对消息类型{ msgtype }的支持|.
@@ -941,7 +1044,6 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
         ENDIF.
         wa_in-markdown-title = title.
         wa_in-markdown-text = text.
-
       WHEN OTHERS.
         rtype = 'E'.
         rtmsg = |当前版本尚未添加对消息类型{ msgtype }的支持|.
@@ -1215,5 +1317,66 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
       rtmsg = |初始化appname:{ appname }的部门:{ dept_id }员工列表失败|.
     ENDIF.
 
+  ENDMETHOD.
+
+
+  METHOD upload_media.
+    " 返回json结构
+    TYPES: BEGIN OF t_JSON1,
+             errcode    TYPE i,
+             errmsg     TYPE string,
+             media_id   TYPE string,
+             created_at TYPE p LENGTH 16 DECIMALS 0,
+             type       TYPE string,
+           END OF t_JSON1.
+    DATA:wa_out TYPE t_JSON1.
+
+    DATA:url     TYPE string,
+         out_put TYPE string,
+         otmsg   TYPE string,
+         status  TYPE i.
+    DATA:access_token TYPE ztddconfig-access_token.
+
+    CLEAR:rtype,rtmsg.
+*    获取token  26.04.2024 11:11:45 by kkw
+    CALL METHOD me->gettoken
+      IMPORTING
+        rtype        = rtype
+        rtmsg        = rtmsg
+        access_token = access_token.
+    IF rtype NE 'S'.
+      RETURN.
+    ENDIF.
+    url = |{ upload_media_url }?access_token={ access_token }&type={ type }|.
+    CALL METHOD zcl_dingtalk=>create_http_client
+      EXPORTING
+*       input     =
+        media     = media
+        url       = url
+*       username  =
+*       password  =
+        reqmethod = 'POST'
+*       http1_1   = ABAP_TRUE
+*       proxy     =
+        bodytype  = 'FORM-DATA'
+        header    = header
+      IMPORTING
+        output    = out_put
+        rtmsg     = otmsg
+        status    = status.
+
+    IF status EQ 200.
+      /ui2/cl_json=>deserialize( EXPORTING json = out_put pretty_name = /ui2/cl_json=>pretty_mode-low_case CHANGING data = wa_out ).
+      IF wa_out-errcode EQ 0.
+        rtype = 'S'.
+        media_id = wa_out-media_id.
+      ELSE.
+        rtype = 'E'.
+      ENDIF.
+      rtmsg = |调用appname:{ appname }上传媒体文件返回信息:{ wa_out-errmsg },errcode:{ wa_out-errcode },media_id:{ wa_out-media_id }状态码:{ status }|.
+    ELSE.
+      rtype = 'E'.
+      rtmsg = |调用appname:{ appname }上传媒体文件发生了问题:{ otmsg },状态码:{ status }|.
+    ENDIF.
   ENDMETHOD.
 ENDCLASS.

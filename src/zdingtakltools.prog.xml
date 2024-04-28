@@ -41,6 +41,12 @@
     </item>
     <item>
      <ID>S</ID>
+     <KEY>P5</KEY>
+     <ENTRY>上传文件</ENTRY>
+     <LENGTH>12</LENGTH>
+    </item>
+    <item>
+     <ID>S</ID>
      <KEY>P_ALL</KEY>
      <ENTRY>完全初始化</ENTRY>
      <LENGTH>13</LENGTH>
@@ -57,6 +63,18 @@
      <KEY>P_DEPTID</KEY>
      <ENTRY>部门ID(钉钉的dept_id)</ENTRY>
      <LENGTH>24</LENGTH>
+    </item>
+    <item>
+     <ID>S</ID>
+     <KEY>P_FILE</KEY>
+     <ENTRY>选择要上传的文件</ENTRY>
+     <LENGTH>16</LENGTH>
+    </item>
+    <item>
+     <ID>S</ID>
+     <KEY>P_MEDID</KEY>
+     <ENTRY>钉钉媒体文件mediaid</ENTRY>
+     <LENGTH>21</LENGTH>
     </item>
     <item>
      <ID>S</ID>
