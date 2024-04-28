@@ -5,10 +5,6 @@ class ZCL_DINGTALK definition
 
 public section.
 
-  constants GETTOKEN_URL type STRING value `https://oapi.dingtalk.com/gettoken` ##NO_TEXT.
-  constants CORPCONVERSATION_URL type STRING value `https://oapi.dingtalk.com/topapi/message/corpconversation/asyncsend_v2` ##NO_TEXT.
-  constants GETDEPT_URL type STRING value `https://oapi.dingtalk.com/topapi/v2/department/listsub` ##NO_TEXT.
-  constants GETUSER_URL type STRING value `https://oapi.dingtalk.com/topapi/v2/user/get` ##NO_TEXT.
   data:
     lt_ztddlistsub TYPE TABLE OF ztddlistsub .
   data:
@@ -16,61 +12,108 @@ public section.
   data:
     lt_ztdduser  TYPE TABLE OF ztdduser .
 
+  methods CONSTRUCTOR
+    importing
+      value(APPID) type ZE_APPID .
   class-methods CREATE_HTTP_CLIENT
     importing
-      !INPUT type STRING optional
-      !URL type STRING
-      !USERNAME type STRING optional
-      !PASSWORD type STRING optional
-      !REQMETHOD type CHAR4
-      !HTTP1_1 type ABAP_BOOL default ABAP_TRUE
-      !PROXY type STRING optional
-      !BODYTYPE type STRING default 'JSON'
-      !HEADER type STANDARD TABLE optional
+      value(INPUT) type STRING optional
+      value(URL) type STRING
+      value(USERNAME) type STRING optional
+      value(PASSWORD) type STRING optional
+      value(REQMETHOD) type CHAR4
+      value(HTTP1_1) type ABAP_BOOL default ABAP_TRUE
+      value(PROXY) type STRING optional
+      value(BODYTYPE) type STRING default 'JSON'
+      value(HEADER) type STANDARD TABLE optional
     exporting
       value(OUTPUT) type STRING
       value(RTMSG) type STRING
       value(STATUS) type I .
-  methods POST2DDROBOT .
-  methods POST2CORPCONVERSATION .
+  methods POST2DDROBOT
+    importing
+      value(MSGTYPE) type ZE_MSGTYPE default 'text'
+      value(TITLE) type STRING optional
+      value(TEXT) type STRING optional
+    exporting
+      value(RTYPE) type BAPI_MTYPE
+      value(RTMSG) type BAPI_MSG .
+  methods POST2CORPCONVERSATION
+    importing
+      value(MSGTYPE) type ZE_MSGTYPE default 'text'
+      value(USERID) type ZE_USERID
+      value(TITLE) type STRING optional
+      value(TEXT) type STRING optional
+    exporting
+      value(RTYPE) type BAPI_MTYPE
+      value(RTMSG) type BAPI_MSG .
   methods GET_USERINFO
     importing
-      !APPID type ZE_APPID
-      !LANGUAGE type CHAR5 default 'zh_CN'
-      !USERID type ZE_USERID
+      value(LANGUAGE) type CHAR5 default 'zh_CN'
+      value(USERID) type ZE_USERID
     exporting
       value(RTYPE) type BAPI_MTYPE
       value(RTMSG) type BAPI_MSG
       value(GT_ZTDDUSER) like LT_ZTDDUSER .
   methods GET_DEPT
     importing
-      !APPID type ZE_APPID
-      !DEPT_ID type ZE_DEPT_ID default 1
-      !LANGUAGE type CHAR5 default 'zh_CN'
+      value(DEPT_ID) type ZE_DEPT_ID default 1
+      value(LANGUAGE) type CHAR5 default 'zh_CN'
     exporting
       value(RTYPE) type BAPI_MTYPE
       value(RTMSG) type BAPI_MSG
       value(GT_ZTDDLISTSUB) like LT_ZTDDLISTSUB .
   methods GET_USERLIST
     importing
-      !APPID type ZE_APPID
-      !DEPT_ID type ZE_DEPT_ID
+      value(DEPT_ID) type ZE_DEPT_ID
     exporting
       value(RTYPE) type BAPI_MTYPE
       value(RTMSG) type BAPI_MSG
       value(GT_USERLIST) like LT_USERID_LIST .
-  PROTECTED SECTION.
-  PRIVATE SECTION.
+  methods INIT_DEPT
+    importing
+      value(DEPT_ID) type ZE_DEPT_ID default 1
+      value(LANGUAGE) type CHAR5 default 'zh_CN'
+      value(INIT_ALL) type ABAP_BOOL default ABAP_FALSE
+    exporting
+      value(RTYPE) type BAPI_MTYPE
+      value(RTMSG) type BAPI_MSG
+      value(GT_ZTDDLISTSUB_TOTAL) like LT_ZTDDLISTSUB .
+  methods INIT_USER
+    importing
+      value(DEPT_ID) type ZE_DEPT_ID
+      value(INIT_ALL) type ABAP_BOOL default ABAP_FALSE
+    exporting
+      value(RTYPE) type BAPI_MTYPE
+      value(RTMSG) type BAPI_MSG .
+  methods GET_DEPTSUBALL
+    importing
+      value(ZTDDLISTSUB_IN) like LT_ZTDDLISTSUB
+    exporting
+      !ZTDDLISTSUB_OUT like LT_ZTDDLISTSUB .
+protected section.
+private section.
 
-    CONSTANTS getuserlist_url TYPE string VALUE `https://oapi.dingtalk.com/topapi/user/listid` ##NO_TEXT.
+  data APPID type ZE_APPID .
+  data APPNAME type ZE_NAME .
+  constants CORPCONVERSATION_URL type STRING value `https://oapi.dingtalk.com/topapi/message/corpconversation/asyncsend_v2` ##NO_TEXT.
+  constants GET_DEPT_URL type STRING value `https://oapi.dingtalk.com/topapi/v2/department/listsub` ##NO_TEXT.
+  constants GET_TOKEN_URL type STRING value `https://oapi.dingtalk.com/gettoken` ##NO_TEXT.
+  constants GET_USER_URL type STRING value `https://oapi.dingtalk.com/topapi/v2/user/get` ##NO_TEXT.
+  constants GET_USERLIST_URL type STRING value `https://oapi.dingtalk.com/topapi/user/listid` ##NO_TEXT.
 
-    METHODS gettoken
-      IMPORTING
-        !appid              TYPE ze_appid
-      EXPORTING
-        !rtype              TYPE bapi_mtype
-        !rtmsg              TYPE bapi_msg
-        VALUE(access_token) TYPE ze_access_token .
+  methods GETTOKEN
+    exporting
+      value(RTYPE) type BAPI_MTYPE
+      value(RTMSG) type BAPI_MSG
+      value(ACCESS_TOKEN) type ZE_ACCESS_TOKEN
+      value(AGENTID) type ZE_AGENTID .
+  methods GETSIGN
+    importing
+      value(SECRET) type STRING
+    exporting
+      value(SIGN) type STRING
+      value(TIMESTAMP) type STRING .
 ENDCLASS.
 
 
@@ -121,24 +164,6 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
       rtmsg = message.
       RETURN.
     ENDIF.
-
-*  CALL METHOD CL_HTTP_CLIENT=>CREATE "/CREATE(直接通过IP端口)
-*    EXPORTING
-*      HOST               = 'xmdceshi.wiskind.cn'
-*      SERVICE            = '443'
-*      SCHEME             = '2'
-*    IMPORTING
-*      CLIENT             = HTTP_OBJECT
-*    EXCEPTIONS
-*      ARGUMENT_NOT_FOUND = 1
-*      PLUGIN_NOT_ACTIVE  = 2
-*      INTERNAL_ERROR     = 3
-*      OTHERS             = 4.
-*  IF SY-SUBRC NE 0.
-*    HTTP_OBJECT->GET_LAST_ERROR( IMPORTING MESSAGE = MESSAGE ).
-*    RTMSG = MESSAGE.
-*    RETURN.
-*  ENDIF.
 
 *不显示登录屏幕
     http_object->propertytype_logon_popup = http_object->co_disabled.
@@ -259,9 +284,6 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
 
     output = result.
 
-    IF result CS '失败'.
-      status = '500'.
-    ENDIF.
   ENDMETHOD.
 
 
@@ -279,7 +301,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
          otmsg   TYPE string,
          status  TYPE i.
     DATA: minutes TYPE i.
-
+    CHECK appid IS NOT INITIAL.
     SELECT SINGLE * FROM ztddconfig WHERE appid = @appid INTO @DATA(wa_conf).
     IF sy-subrc NE 0.
       rtype = 'E'.
@@ -291,6 +313,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
         rtmsg = |获取access_token,请配置ztddconfig表appid:{ appid }的appkey和appsecret信息|.
         RETURN.
       ENDIF.
+      agentid = wa_conf-agentid.
       IF wa_conf-token_date IS NOT INITIAL AND wa_conf-token_time IS NOT INITIAL "检验access_token有效性，避免重复获取
         AND wa_conf-expires_in IS NOT INITIAL AND wa_conf-access_token IS NOT INITIAL.
         CALL FUNCTION 'DELTA_TIME_DAY_HOUR'
@@ -310,7 +333,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
         ENDIF.
       ENDIF.
     ENDIF.
-    url = |{ gettoken_url }?appkey={ wa_conf-appkey }&appsecret={ wa_conf-appsecret }|.
+    url = |{ get_token_url }?appkey={ wa_conf-appkey }&appsecret={ wa_conf-appsecret }|.
     CALL METHOD zcl_dingtalk=>create_http_client
       EXPORTING
 *       input     =
@@ -326,27 +349,28 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
         output    = out_put
         rtmsg     = otmsg
         status    = status.
-    IF status NE 200.
+
+    IF status EQ 200.
+      /ui2/cl_json=>deserialize( EXPORTING json = out_put  pretty_name = /ui2/cl_json=>pretty_mode-low_case CHANGING data = wa_token ).
+      IF wa_token-errcode EQ 0.
+        rtype = 'S'.
+        access_token = wa_token-access_token.
+        UPDATE ztddconfig SET
+          access_token = @wa_token-access_token,
+          expires_in = @wa_token-expires_in,
+          token_date = @sy-datum,
+          token_time = @sy-uzeit
+          WHERE appid = @appid.
+        COMMIT WORK AND WAIT.
+      ELSE.
+        rtype = 'E'.
+      ENDIF.
+      rtmsg = |调用{ appid }获取access_token返回信息:{ wa_token-errmsg }，状态码:{ status }|.
+    ELSE.
       rtype = 'E'.
       rtmsg = |调用{ appid }获取access_token发生了问题:{ otmsg }，状态码:{ status }|.
-      RETURN.
     ENDIF.
-    /ui2/cl_json=>deserialize( EXPORTING json = out_put  pretty_name = /ui2/cl_json=>pretty_mode-low_case CHANGING data = wa_token ).
-    IF wa_token-errcode NE 0.
-      rtype = 'E'.
-      rtmsg = |调用{ appid }获取access_token返回错误信息:{ wa_token-errmsg }，状态码:{ status }|.
-      RETURN.
-    ENDIF.
-    rtype = 'S'.
-    rtmsg = wa_token-errmsg.
-    UPDATE ztddconfig SET
-    access_token = @wa_token-access_token,
-    expires_in = @wa_token-expires_in,
-    token_date = @sy-datum,
-    token_time = @sy-uzeit
-    WHERE appid = @appid.
-    COMMIT WORK AND WAIT.
-    access_token = wa_token-access_token.
+
   ENDMETHOD.
 
 
@@ -369,11 +393,10 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
            END OF t_RESULT2.
     TYPES: tt_RESULT2 TYPE STANDARD TABLE OF t_RESULT2 WITH DEFAULT KEY.
     TYPES: BEGIN OF t_JSON1,
-             errcode      TYPE i,
-             errcode_desc TYPE string,
-             errmsg       TYPE string,
-             result       TYPE tt_RESULT2,
-             request_id   TYPE string,
+             errcode    TYPE i,
+             errmsg     TYPE string,
+             result     TYPE tt_RESULT2,
+             request_id TYPE string,
            END OF t_JSON1.
     DATA:wa_dept TYPE t_JSON1.
 
@@ -382,14 +405,10 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
          otmsg   TYPE string,
          status  TYPE i.
     DATA:access_token TYPE ztddconfig-access_token.
-    DATA:gt_ztddlistsub_sub   TYPE TABLE OF ztddlistsub,
-         gt_ztddlistsub_total TYPE TABLE OF ztddlistsub.
 
-    CLEAR:rtype,rtmsg,gt_ztddlistsub,gt_ztddlistsub_total.
+    CLEAR:rtype,rtmsg,gt_ztddlistsub.
 *    获取token  26.04.2024 11:11:45 by kkw
     CALL METHOD me->gettoken
-      EXPORTING
-        appid        = appid
       IMPORTING
         rtype        = rtype
         rtmsg        = rtmsg
@@ -398,7 +417,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
       RETURN.
     ENDIF.
     CLEAR:rtype,rtmsg,json_in,wa_in.
-    url = |{ getdept_url }?access_token={ access_token }|.
+    url = |{ get_dept_url }?access_token={ access_token }|.
     wa_in-language = language.
     wa_in-dept_id = dept_id.
     json_in = /ui2/cl_json=>serialize( data = wa_in  compress = abap_false pretty_name = /ui2/cl_json=>pretty_mode-low_case ).
@@ -418,51 +437,31 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
         output    = out_put
         rtmsg     = otmsg
         status    = status.
-    IF status NE 200.
-      rtype = 'E'.
-      rtmsg = |调用{ appid }获取listsub发生了问题:{ otmsg }，状态码:{ status }|.
-      RETURN.
-    ENDIF.
-    /ui2/cl_json=>deserialize( EXPORTING json = out_put  pretty_name = /ui2/cl_json=>pretty_mode-low_case CHANGING data = wa_dept ).
-    CASE wa_dept-errcode.
-      WHEN 60003.
-        wa_dept-errcode_desc = |未找到对应部门,请确认dept_id是否正确|.
-      WHEN 400002.
-        wa_dept-errcode_desc = |无效的参数,请确认参数是否按要求输入|.
-      WHEN -1.
-        wa_dept-errcode_desc = |系统繁忙,请稍后再试|.
-      WHEN OTHERS.
-        wa_dept-errcode_desc = wa_dept-errcode.
-    ENDCASE.
-    IF wa_dept-errcode NE 0.
-      rtype = 'E'.
-      rtmsg = |调用{ appid }获取listsub返回错误信息:{ wa_dept-errmsg }，errcode:{ wa_dept-errcode_desc },状态码:{ status }|.
-      RETURN.
-    ENDIF.
-    MOVE-CORRESPONDING wa_dept-result TO gt_ztddlistsub.
-    DELETE gt_ztddlistsub WHERE dept_id IS INITIAL.
-    APPEND LINES OF gt_ztddlistsub TO gt_ztddlistsub_total.
-*    循环获取所有下级部门列表  26.04.2024 10:40:31 by kkw
-    LOOP AT gt_ztddlistsub ASSIGNING FIELD-SYMBOL(<gt_ztddlistsub>).
-      CLEAR:rtype,rtmsg,gt_ztddlistsub_sub.
-      CALL METHOD me->get_dept
-        EXPORTING
-          appid          = appid
-          dept_id        = <gt_ztddlistsub>-dept_id
-*         language       = 'zh_CN'
-        IMPORTING
-*         rtype          = rtype
-*         rtmsg          = rtmsg
-          gt_ztddlistsub = gt_ztddlistsub_sub.
-      DELETE gt_ztddlistsub_sub WHERE dept_id IS INITIAL.
-      IF gt_ztddlistsub_sub IS NOT INITIAL.
-        APPEND LINES OF gt_ztddlistsub_sub TO gt_ztddlistsub_total.
+
+    IF status EQ 200.
+      /ui2/cl_json=>deserialize( EXPORTING json = out_put  pretty_name = /ui2/cl_json=>pretty_mode-low_case CHANGING data = wa_dept ).
+      IF wa_dept-errcode EQ 0.
+        LOOP AT wa_dept-result ASSIGNING FIELD-SYMBOL(<result>).
+          IF NOT <result>-dept_id IS INITIAL.
+            INSERT INITIAL LINE INTO TABLE gt_ztddlistsub ASSIGNING FIELD-SYMBOL(<gt_ztddlistsub>).
+            <gt_ztddlistsub>-dept_id = <result>-dept_id.
+            <gt_ztddlistsub>-name = <result>-name.
+            <gt_ztddlistsub>-parent_id = <result>-parent_id.
+          ENDIF.
+        ENDLOOP.
+        IF gt_ztddlistsub IS INITIAL.
+          rtype = 'W'.
+        ELSE.
+          rtype = 'S'.
+        ENDIF.
+      ELSE.
+        rtype = 'E'.
       ENDIF.
-    ENDLOOP.
-    rtype = 'S'.
-    rtmsg = wa_dept-errmsg.
-    MODIFY ztddlistsub FROM TABLE gt_ztddlistsub_total.
-    COMMIT WORK AND WAIT.
+      rtmsg = |调用appname:{ appname }获取部门:{ dept_id }列表返回信息:{ wa_dept-errmsg },errcode:{ wa_dept-errcode },状态码:{ status }|.
+    ELSE.
+      rtype = 'E'.
+      rtmsg = |调用appname:{ appname }获取部门:{ dept_id }列表发生了问题:{ otmsg },状态码:{ status }|.
+    ENDIF.
 
   ENDMETHOD.
 
@@ -531,10 +530,9 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
              state_code        TYPE string,
            END OF t_RESULT8.
     TYPES: BEGIN OF t_JSON1,
-             errcode      TYPE string,
-             errcode_desc TYPE string,
-             result       TYPE t_RESULT8,
-             errmsg       TYPE string,
+             errcode TYPE string,
+             result  TYPE t_RESULT8,
+             errmsg  TYPE string,
            END OF t_JSON1.
     DATA:wa_userinfo TYPE t_JSON1.
     DATA:url     TYPE string,
@@ -546,8 +544,8 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
     CLEAR:rtype,rtmsg.
 *    获取token
     CALL METHOD me->gettoken
-      EXPORTING
-        appid        = appid
+*      EXPORTING
+*        appid        = appid
       IMPORTING
         rtype        = rtype
         rtmsg        = rtmsg
@@ -555,8 +553,8 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
     IF rtype NE 'S'.
       RETURN.
     ENDIF.
-    CLEAR:rtype,rtmsg,json_in,wa_in.
-    url = |{ getuser_url }?access_token={ access_token }|.
+
+    url = |{ get_user_url }?access_token={ access_token }|.
     wa_in-language = language.
     wa_in-userid = userid.
     json_in = /ui2/cl_json=>serialize( data = wa_in  compress = abap_false pretty_name = /ui2/cl_json=>pretty_mode-low_case ).
@@ -576,37 +574,29 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
         output    = out_put
         rtmsg     = otmsg
         status    = status.
-    IF status NE 200.
+
+    IF status EQ 200.
+      /ui2/cl_json=>deserialize( EXPORTING json = out_put pretty_name = /ui2/cl_json=>pretty_mode-low_case CHANGING data = wa_userinfo ).
+      IF wa_userinfo-errcode EQ 0.
+        rtype = 'S'.
+        CLEAR:gt_ztdduser.
+        LOOP AT wa_userinfo-result-dept_id_list ASSIGNING FIELD-SYMBOL(<dept_id_list>).
+          INSERT INITIAL LINE INTO TABLE gt_ztdduser ASSIGNING FIELD-SYMBOL(<gt_ztdduser>).
+          <gt_ztdduser>-dept_id = <dept_id_list>.
+          <gt_ztdduser>-userid = wa_userinfo-result-userid.
+          <gt_ztdduser>-job_number = wa_userinfo-result-job_number.
+          <gt_ztdduser>-name = wa_userinfo-result-name.
+          <gt_ztdduser>-mobile = wa_userinfo-result-mobile.
+        ENDLOOP.
+      ELSE.
+        rtype = 'E'.
+      ENDIF.
+      rtmsg = |获取appname:{ appname }的员工:{ userid }详情返回信息:{ wa_userinfo-errmsg },errcode:{ wa_userinfo-errcode },状态码:{ status }|.
+    ELSE.
       rtype = 'E'.
-      rtmsg = |调用{ appid }获取user发生了问题:{ otmsg }，状态码:{ status }|.
-      RETURN.
+      rtmsg = |获取appname:{ appname }的员工:{ userid }详情发生了问题:{ otmsg },状态码:{ status }|.
     ENDIF.
-    /ui2/cl_json=>deserialize( EXPORTING json = out_put  pretty_name = /ui2/cl_json=>pretty_mode-low_case CHANGING data = wa_userinfo ).
-    CASE wa_userinfo-errcode.
-      WHEN 33012.
-        wa_userinfo-errcode_desc = |无效的userId,请检查userId是否正确|.
-      WHEN 400002.
-        wa_userinfo-errcode_desc = |无效的参数,请确认参数是否按要求输入|.
-      WHEN -1.
-        wa_userinfo-errcode_desc = |系统繁忙,请稍后再试|.
-      WHEN OTHERS.
-        wa_userinfo-errcode_desc = wa_userinfo-errcode.
-    ENDCASE.
-    IF wa_userinfo-errcode NE 0.
-      rtype = 'E'.
-      rtmsg = |调用{ appid }获取user返回错误信息:{ wa_userinfo-errmsg }，errcode:{ wa_userinfo-errcode_desc },状态码:{ status }|.
-      RETURN.
-    ENDIF.
-    CLEAR:gt_ztdduser.
-    LOOP AT wa_userinfo-result-dept_id_list ASSIGNING FIELD-SYMBOL(<dept_id_list>).
-      INSERT INITIAL LINE INTO TABLE gt_ztdduser ASSIGNING FIELD-SYMBOL(<gt_ztdduser>).
-      <gt_ztdduser>-dept_id = <dept_id_list>.
-      <gt_ztdduser>-userid = wa_userinfo-result-userid.
-      <gt_ztdduser>-name = wa_userinfo-result-name.
-      <gt_ztdduser>-mobile = wa_userinfo-result-mobile.
-    ENDLOOP.
-    rtype = 'S'.
-    rtmsg = wa_userinfo-errmsg.
+
   ENDMETHOD.
 
 
@@ -624,11 +614,10 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
              userid_list TYPE tt_USERID_LIST2,
            END OF t_RESULT3.
     TYPES: BEGIN OF t_JSON1,
-             errcode      TYPE i,
-             errcode_desc TYPE string,
-             errmsg       TYPE string,
-             result       TYPE t_RESULT3,
-             request_id   TYPE string,
+             errcode    TYPE i,
+             errmsg     TYPE string,
+             result     TYPE t_RESULT3,
+             request_id TYPE string,
            END OF t_JSON1.
     DATA:wa_userlist TYPE t_JSON1.
     DATA:url     TYPE string,
@@ -640,8 +629,8 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
     CLEAR:rtype,rtmsg,gt_userlist.
 *    获取token
     CALL METHOD me->gettoken
-      EXPORTING
-        appid        = appid
+*      EXPORTING
+*        appid        = appid
       IMPORTING
         rtype        = rtype
         rtmsg        = rtmsg
@@ -650,7 +639,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
       RETURN.
     ENDIF.
     CLEAR:rtype,rtmsg,json_in,wa_in.
-    url = |{ getuserlist_url }?access_token={ access_token }|.
+    url = |{ get_userlist_url }?access_token={ access_token }|.
     wa_in-dept_id = dept_id.
     json_in = /ui2/cl_json=>serialize( data = wa_in  compress = abap_false pretty_name = /ui2/cl_json=>pretty_mode-low_case ).
 
@@ -669,37 +658,562 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
         output    = out_put
         rtmsg     = otmsg
         status    = status.
-    IF status NE 200.
+    IF status EQ 200.
+      /ui2/cl_json=>deserialize( EXPORTING json = out_put  pretty_name = /ui2/cl_json=>pretty_mode-low_case CHANGING data = wa_userlist ).
+      IF wa_userlist-errcode EQ 0.
+        rtype = 'S'.
+        APPEND LINES OF wa_userlist-result-userid_list TO gt_userlist.
+      ELSE.
+        rtype = 'E'.
+      ENDIF.
+      rtmsg = |调用appname:{ appname }的部门:{ dept_id }用户列表返回信息:{ wa_userlist-errmsg }，errcode:{ wa_userlist-errcode },状态码:{ status }|.
+    ELSE.
       rtype = 'E'.
-      rtmsg = |调用{ appid }获取listsub发生了问题:{ otmsg }，状态码:{ status }|.
-      RETURN.
+      rtmsg = |调用appname:{ appname }的部门:{ dept_id }用户列表发生了问题:{ otmsg },状态码:{ status }|.
     ENDIF.
-    /ui2/cl_json=>deserialize( EXPORTING json = out_put  pretty_name = /ui2/cl_json=>pretty_mode-low_case CHANGING data = wa_userlist ).
-    CASE wa_userlist-errcode.
-      WHEN 60003.
-        wa_userlist-errcode_desc = |未找到对应部门,请确认dept_id是否正确|.
-      WHEN 400002.
-        wa_userlist-errcode_desc = |无效的参数,请确认参数是否按要求输入|.
-      WHEN -1.
-        wa_userlist-errcode_desc = |系统繁忙,请稍后再试|.
-      WHEN OTHERS.
-        wa_userlist-errcode_desc = wa_userlist-errcode.
-    ENDCASE.
-    IF wa_userlist-errcode NE 0.
-      rtype = 'E'.
-      rtmsg = |调用{ appid }获取userlist返回错误信息:{ wa_userlist-errmsg }，errcode:{ wa_userlist-errcode_desc },状态码:{ status }|.
-      RETURN.
-    ENDIF.
-    APPEND LINES OF wa_userlist-result-userid_list TO gt_userlist.
-    rtype = 'S'.
-    rtmsg = wa_userlist-errmsg.
+
   ENDMETHOD.
 
 
   METHOD post2corpconversation.
+*    传入结构  27.04.2024 11:24:57 by kkw
+    TYPES: BEGIN OF t_RICH7,
+             unit TYPE string,
+             num  TYPE string,
+           END OF t_RICH7.
+    TYPES: BEGIN OF t_FORM6,
+             value TYPE string,
+             key   TYPE string,
+           END OF t_FORM6.
+    TYPES: BEGIN OF t_STATUS_BAR5,
+             status_value TYPE string,
+             status_bg    TYPE string,
+           END OF t_STATUS_BAR5.
+    TYPES: BEGIN OF t_HEAD4,
+             bgcolor TYPE string,
+             text    TYPE string,
+           END OF t_HEAD4.
+    TYPES: BEGIN OF t_BODY8,
+             file_count TYPE string,
+             image      TYPE string,
+             form       TYPE t_FORM6,
+             author     TYPE string,
+             rich       TYPE t_RICH7,
+             title      TYPE string,
+             content    TYPE string,
+           END OF t_BODY8.
+    TYPES: BEGIN OF t_BTN_JSON_LIST11,
+             action_url TYPE string,
+             title      TYPE string,
+           END OF t_BTN_JSON_LIST11.
+    TYPES: BEGIN OF t_ACTION_CARD12,
+             btn_json_list   TYPE t_BTN_JSON_LIST11,
+             single_url      TYPE string,
+             btn_orientation TYPE string,
+             single_title    TYPE string,
+             markdown        TYPE string,
+             title           TYPE string,
+           END OF t_ACTION_CARD12.
+    TYPES: BEGIN OF t_IMAGE3,
+             media_id TYPE string,
+           END OF t_IMAGE3.
+    TYPES: BEGIN OF t_OA9,
+             head           TYPE t_HEAD4,
+             pc_message_url TYPE string,
+             status_bar     TYPE t_STATUS_BAR5,
+             body           TYPE t_BODY8,
+             message_url    TYPE string,
+           END OF t_OA9.
+    TYPES: BEGIN OF t_VOICE2,
+             duration TYPE string,
+             media_id TYPE string,
+           END OF t_VOICE2.
+    TYPES: BEGIN OF t_LINK13,
+             pic_url     TYPE string,
+             message_url TYPE string,
+             text        TYPE string,
+             title       TYPE string,
+           END OF t_LINK13.
+    TYPES: BEGIN OF t_FILE10,
+             media_id TYPE string,
+           END OF t_FILE10.
+    TYPES: BEGIN OF t_MARKDOWN14,
+             text  TYPE string,
+             title TYPE string,
+           END OF t_MARKDOWN14.
+    TYPES: BEGIN OF t_TEXT15,
+             content TYPE string,
+           END OF t_TEXT15.
+    TYPES: t_DEPT_ID_LIST17 TYPE ztddlistsub-dept_id.
+    TYPES: t_USERID_LIST18 TYPE ztdduser-userid.
+    TYPES: BEGIN OF t_MSG16,
+             voice       TYPE t_VOICE2,
+             image       TYPE t_IMAGE3,
+             oa          TYPE t_OA9,
+             file        TYPE t_FILE10,
+             action_card TYPE t_ACTION_CARD12,
+             link        TYPE t_LINK13,
+             markdown    TYPE t_MARKDOWN14,
+             text        TYPE t_TEXT15,
+             msgtype     TYPE string,
+           END OF t_MSG16.
+    TYPES: tt_DEPT_ID_LIST17 TYPE STANDARD TABLE OF t_DEPT_ID_LIST17 WITH DEFAULT KEY.
+    TYPES: tt_USERID_LIST18 TYPE STANDARD TABLE OF t_USERID_LIST18 WITH DEFAULT KEY.
+    TYPES: BEGIN OF t_JSON1_in,
+             msg         TYPE t_MSG16,
+             to_all_user TYPE abap_bool,
+             agent_id    TYPE ztddconfig-agentid,
+*             dept_id_list TYPE string, "tt_DEPT_ID_LIST17,
+             userid_list TYPE string, "tt_USERID_LIST18,
+           END OF t_JSON1_in.
+    DATA:wa_in   TYPE t_JSON1_in,
+         json_in TYPE string.
+*    传出结构  27.04.2024 11:24:57 by kkw
+    TYPES: BEGIN OF t_JSON1,
+             errcode    TYPE i,
+             errmsg     TYPE string,
+             task_id    TYPE p LENGTH 16 DECIMALS 0,
+             request_id TYPE string,
+           END OF t_JSON1.
+    DATA:wa_out TYPE t_JSON1.
+
+    DATA:url     TYPE string,
+         out_put TYPE string,
+         otmsg   TYPE string,
+         status  TYPE i.
+    DATA:access_token TYPE ztddconfig-access_token.
+    CLEAR:rtype,rtmsg.
+    CASE msgtype.
+      WHEN 'text'.
+        IF text IS INITIAL.
+          rtype = 'E'.
+          rtmsg = |消息类型{ msgtype }的text不能为空|.
+          RETURN.
+        ENDIF.
+        wa_in-msg-text-content = text.
+      WHEN 'markdown'.
+        IF text IS INITIAL OR title IS INITIAL.
+          rtype = 'E'.
+          rtmsg = |消息类型{ msgtype }的title和text均不能为空|.
+          RETURN.
+        ENDIF.
+        wa_in-msg-markdown-title = title.
+        wa_in-msg-markdown-text = text.
+
+      WHEN OTHERS.
+        rtype = 'E'.
+        rtmsg = |当前版本尚未添加对消息类型{ msgtype }的支持|.
+        RETURN.
+    ENDCASE.
+*    获取token  26.04.2024 11:11:45 by kkw
+    CALL METHOD me->gettoken
+      IMPORTING
+        rtype        = rtype
+        rtmsg        = rtmsg
+        access_token = access_token
+        agentid      = wa_in-agent_id.
+    IF rtype NE 'S'.
+      RETURN.
+    ENDIF.
+    url = |{ corpconversation_url }?access_token={ access_token }|.
+    wa_in-to_all_user = abap_false.
+    wa_in-msg-msgtype = msgtype.
+*    APPEND userid TO wa_in-userid_list.
+    wa_in-userid_list = userid.
+
+    json_in = /ui2/cl_json=>serialize( data = wa_in  compress = abap_false pretty_name = /ui2/cl_json=>pretty_mode-low_case ).
+    CALL METHOD zcl_dingtalk=>create_http_client
+      EXPORTING
+        input     = json_in
+        url       = url
+*       username  =
+*       password  =
+        reqmethod = 'POST'
+*       http1_1   = ABAP_TRUE
+*       proxy     =
+*       bodytype  = 'JSON'
+*       header    =
+      IMPORTING
+        output    = out_put
+        rtmsg     = otmsg
+        status    = status.
+    IF status EQ 200.
+      /ui2/cl_json=>deserialize( EXPORTING json = out_put pretty_name = /ui2/cl_json=>pretty_mode-low_case CHANGING data = wa_out ).
+      IF wa_out-errcode EQ 0.
+        rtype = 'S'.
+      ELSE.
+        rtype = 'E'.
+      ENDIF.
+      rtmsg = |调用工作通知:{ appname }发送消息返回信息:errcode:{ wa_out-errcode },errmsg:{ wa_out-errmsg },task_id:{ wa_out-task_id },request_id:{ wa_out-request_id },状态码:{ status }|.
+    ELSE.
+      rtype = 'E'.
+      rtmsg = |调用工作通知:{ appname }发送消息发生了问题:{ otmsg },状态码:{ status }|.
+    ENDIF.
+
   ENDMETHOD.
 
 
   METHOD post2ddrobot.
+*    传入结构
+    TYPES: t_AT_MOBILES2 TYPE string.
+    TYPES: t_AT_USER_IDS3 TYPE string.
+    TYPES: BEGIN OF t_LINKS10,
+             title       TYPE string,
+             message_url TYPE string,
+             pic_url     TYPE string,
+           END OF t_LINKS10.
+    TYPES: BEGIN OF t_BTNS8,
+             title      TYPE string,
+             action_url TYPE string,
+           END OF t_BTNS8.
+    TYPES: tt_AT_USER_IDS3 TYPE STANDARD TABLE OF t_AT_USER_IDS3 WITH DEFAULT KEY.
+    TYPES: tt_BTNS8 TYPE STANDARD TABLE OF t_BTNS8 WITH DEFAULT KEY.
+    TYPES: tt_AT_MOBILES2 TYPE STANDARD TABLE OF t_AT_MOBILES2 WITH DEFAULT KEY.
+    TYPES: tt_LINKS10 TYPE STANDARD TABLE OF t_LINKS10 WITH DEFAULT KEY.
+    TYPES: BEGIN OF t_FEED_CARD11,
+             links TYPE tt_LINKS10,
+           END OF t_FEED_CARD11.
+    TYPES: BEGIN OF t_ACTION_CARD9,
+             title           TYPE string,
+             text            TYPE string,
+             btn_orientation TYPE string,
+             single_title    TYPE string,
+             single_url      TYPE string,
+             btns            TYPE tt_BTNS8,
+           END OF t_ACTION_CARD9.
+    TYPES: BEGIN OF t_MARKDOWN7,
+             title TYPE string,
+             text  TYPE string,
+           END OF t_MARKDOWN7.
+    TYPES: BEGIN OF t_LINK6,
+             text        TYPE string,
+             title       TYPE string,
+             pic_url     TYPE string,
+             message_url TYPE string,
+           END OF t_LINK6.
+    TYPES: BEGIN OF t_TEXT5,
+             content TYPE string,
+           END OF t_TEXT5.
+    TYPES: BEGIN OF t_AT4,
+             at_mobiles  TYPE tt_AT_MOBILES2,
+             at_user_ids TYPE tt_AT_USER_IDS3,
+             is_at_all   TYPE abap_bool,
+           END OF t_AT4.
+    TYPES: BEGIN OF t_JSON1_in,
+             at          TYPE t_AT4,
+             text        TYPE t_TEXT5,
+             link        TYPE t_LINK6,
+             markdown    TYPE t_MARKDOWN7,
+             action_card TYPE t_ACTION_CARD9,
+             feed_card   TYPE t_FEED_CARD11,
+             msgtype     TYPE string,
+           END OF t_JSON1_in.
+    DATA:wa_in   TYPE t_JSON1_in,
+         json_in TYPE string.
+*    传出结构
+    TYPES: BEGIN OF t_JSON1,
+             errcode TYPE i,
+             errmsg  TYPE string,
+           END OF t_JSON1.
+    DATA:wa_out TYPE t_JSON1.
+
+    DATA:url     TYPE string,
+         out_put TYPE string,
+         otmsg   TYPE string,
+         status  TYPE i.
+    DATA:sign      TYPE string,
+         timestamp TYPE string.
+
+    wa_in-msgtype = msgtype.
+    CASE msgtype.
+      WHEN 'text'.
+        IF text IS INITIAL.
+          rtype = 'E'.
+          rtmsg = |消息类型{ msgtype }的text不能为空|.
+          RETURN.
+        ENDIF.
+        wa_in-text-content = text.
+      WHEN 'markdown'.
+        IF text IS INITIAL OR title IS INITIAL.
+          rtype = 'E'.
+          rtmsg = |消息类型{ msgtype }的title和text均不能为空|.
+          RETURN.
+        ENDIF.
+        wa_in-markdown-title = title.
+        wa_in-markdown-text = text.
+
+      WHEN OTHERS.
+        rtype = 'E'.
+        rtmsg = |当前版本尚未添加对消息类型{ msgtype }的支持|.
+        RETURN.
+    ENDCASE.
+    SELECT SINGLE * FROM ztddconfig WHERE appid = @appid INTO @DATA(wa_conf).
+    IF sy-subrc NE 0.
+      rtype = 'E'.
+      rtmsg = |发送钉钉群机器人消息,请配置ztddconfig表appid:{ appid }信息|.
+      RETURN.
+    ELSE.
+      IF wa_conf-webhook IS INITIAL OR wa_conf-secret IS INITIAL.
+        rtype = 'E'.
+        rtmsg = |发送钉钉群机器人消息,请配置ztddconfig表appid:{ appid }的webhook和secret信息|.
+        RETURN.
+      ENDIF.
+    ENDIF.
+*    获取签名
+    CALL METHOD me->getsign
+      EXPORTING
+        secret    = wa_conf-secret
+      IMPORTING
+        sign      = sign
+        timestamp = timestamp.
+    IF sign IS INITIAL.
+      rtype = 'E'.
+      rtmsg = '获取签名失败'.
+      RETURN.
+    ENDIF.
+    url = |{ wa_conf-webhook }&timestamp={ timestamp }&sign={ sign }|.
+    json_in = /ui2/cl_json=>serialize( data = wa_in  compress = abap_false pretty_name = /ui2/cl_json=>pretty_mode-low_case ).
+    CALL METHOD zcl_dingtalk=>create_http_client
+      EXPORTING
+        input     = json_in
+        url       = url
+*       username  =
+*       password  =
+        reqmethod = 'POST'
+*       http1_1   = ABAP_TRUE
+*       proxy     =
+*       bodytype  = 'JSON'
+*       header    =
+      IMPORTING
+        output    = out_put
+        rtmsg     = otmsg
+        status    = status.
+
+    IF status EQ 200.
+      /ui2/cl_json=>deserialize( EXPORTING json = out_put  pretty_name = /ui2/cl_json=>pretty_mode-low_case CHANGING data = wa_out ).
+      IF wa_out-errcode EQ 0.
+        rtype = 'S'.
+      ELSE.
+        rtype = 'E'.
+      ENDIF.
+      rtmsg = |调用钉钉群机器人:{ appname }发送消息返回信息:errcode:{ wa_out-errcode },errmsg:{ wa_out-errmsg },状态码:{ status }|.
+    ELSE.
+      rtype = 'E'.
+      rtmsg = |调用钉钉群机器人:{ appname }发送消息发生了问题:{ otmsg },状态码:{ status }|.
+    ENDIF.
+
+  ENDMETHOD.
+
+
+  METHOD constructor.
+    me->appid = appid.
+    SELECT SINGLE name FROM ztddconfig WHERE appid = @appid INTO @me->appname.
+  ENDMETHOD.
+
+
+  METHOD getsign.
+    DATA:if_data_s        TYPE string,
+         if_data          TYPE xstring,
+         if_secret        TYPE xstring,
+         ef_hmacb64string TYPE string,
+         stamp            TYPE timestampl,
+         stamp_char       TYPE char22.
+    CHECK secret IS NOT INITIAL.
+    CLEAR:sign,timestamp.
+    TRY.
+        if_secret = cl_abap_hmac=>string_to_xstring( secret ).
+      CATCH cx_abap_message_digest.
+        EXIT.
+    ENDTRY.
+    DATA(newline) = cl_abap_char_utilities=>newline.
+    GET TIME STAMP FIELD stamp.
+    stamp_char = stamp.
+    CALL METHOD cl_pco_utility=>convert_abap_timestamp_to_java
+      EXPORTING
+        iv_date      = CONV #( stamp_char(8) )
+        iv_time      = CONV #( stamp_char+8(6) )
+        iv_msec      = CONV #( stamp_char+15(3) )
+      IMPORTING
+        ev_timestamp = timestamp.
+    if_data_s = |{ timestamp }{ newline }{ secret }|.
+    TRY.
+        if_data = cl_abap_hmac=>string_to_xstring( if_data_s ).
+      CATCH cx_abap_message_digest.
+        EXIT.
+    ENDTRY.
+    TRY.
+        CALL METHOD cl_abap_hmac=>calculate_hmac_for_raw
+          EXPORTING
+            if_algorithm     = 'SHA256'
+            if_key           = if_secret
+            if_data          = if_data
+*           if_length        = 0
+          IMPORTING
+*           ef_hmacstring    = ef_hmacstring
+*           ef_hmacxstring   = ef_hmacxstring
+            ef_hmacb64string = ef_hmacb64string.
+        .
+      CATCH cx_abap_message_digest.
+        EXIT.
+    ENDTRY.
+    sign = cl_http_utility=>escape_url( ef_hmacb64string ).
+  ENDMETHOD.
+
+
+  METHOD get_deptsuball.
+    DATA:lt_tab TYPE TABLE OF ztddlistsub.
+    CHECK ztddlistsub_in IS NOT INITIAL.
+    SELECT
+      *
+      FROM ztddlistsub
+      FOR ALL ENTRIES IN @ztddlistsub_in
+      WHERE parent_id = @ztddlistsub_in-dept_id
+      AND dept_id IS NOT INITIAL
+      APPENDING TABLE @lt_tab
+      .
+    CHECK lt_tab IS NOT INITIAL.
+    APPEND LINES OF lt_tab TO ztddlistsub_out.
+    CALL METHOD me->get_deptsuball
+      EXPORTING
+        ztddlistsub_in  = lt_tab
+      IMPORTING
+        ztddlistsub_out = ztddlistsub_out.
+
+  ENDMETHOD.
+
+
+  METHOD init_dept.
+    DATA:gt_ztddlistsub_sub TYPE TABLE OF ztddlistsub,
+         gt_ztddlistsub     TYPE TABLE OF ztddlistsub.
+
+    CLEAR:rtype,rtmsg,gt_ztddlistsub_total.
+    CALL METHOD me->get_dept
+      EXPORTING
+        dept_id        = dept_id
+*       language       = 'zh_CN'
+      IMPORTING
+        rtype          = rtype
+        rtmsg          = rtmsg
+        gt_ztddlistsub = gt_ztddlistsub.
+    CHECK rtype = 'S'.
+
+    APPEND LINES OF gt_ztddlistsub TO gt_ztddlistsub_total.
+*    循环获取所有下级部门列表  26.04.2024 10:40:31 by kkw
+    LOOP AT gt_ztddlistsub ASSIGNING FIELD-SYMBOL(<gt_ztddlistsub>).
+      CLEAR:rtype,rtmsg,gt_ztddlistsub_sub.
+      CALL METHOD me->get_dept
+        EXPORTING
+          dept_id        = <gt_ztddlistsub>-dept_id
+*         language       = 'zh_CN'
+        IMPORTING
+*         rtype          = rtype
+*         rtmsg          = rtmsg
+          gt_ztddlistsub = gt_ztddlistsub_sub.
+      IF gt_ztddlistsub_sub IS NOT INITIAL.
+        APPEND LINES OF gt_ztddlistsub_sub TO gt_ztddlistsub_total.
+      ENDIF.
+    ENDLOOP.
+    IF init_all = 'X'.
+      DELETE FROM ztddlistsub.
+      COMMIT WORK AND WAIT.
+    ENDIF.
+    MODIFY ztddlistsub FROM TABLE gt_ztddlistsub_total.
+    IF sy-subrc EQ 0.
+      COMMIT WORK AND WAIT.
+      rtype = 'S'.
+      rtmsg = |初始化appname:{ appname }的部门:{ dept_id }列表成功，数据已存储在ZTDDLISTSUB表中|.
+    ELSE.
+      ROLLBACK WORK.
+      rtype = 'E'.
+      rtmsg = |初始化appname:{ appname }的部门:{ dept_id }列表失败|.
+    ENDIF.
+
+  ENDMETHOD.
+
+
+  METHOD init_user.
+    DATA:lt_ztddlistsub  TYPE TABLE OF ztddlistsub,
+         lt_xmd          TYPE TABLE OF ztddlistsub,
+         gt_userlist     TYPE TABLE OF ztdduser-userid,
+         gt_userlist_all LIKE gt_userlist,
+         gt_ztdduser     TYPE TABLE OF ztdduser,
+         gt_ztdduser_all TYPE TABLE OF ztdduser.
+
+    SELECT
+      *
+      FROM ztddlistsub
+      WHERE dept_id = @dept_id
+      INTO TABLE @lt_xmd
+      .
+    IF lt_xmd IS INITIAL.
+      rtype = 'E'.
+      rtmsg = |表ZTDDLISTSUB未获取到DEPT_ID为{ dept_id }的数据，获取部门列表后再试|.
+      RETURN.
+    ENDIF.
+
+*    获取子部门列表信息
+    SELECT
+      *
+      FROM ztddlistsub
+      WHERE parent_id = @dept_id
+      INTO TABLE @lt_ztddlistsub
+      .
+    APPEND LINES OF lt_ztddlistsub TO lt_xmd.
+    CALL METHOD me->get_deptsuball
+      EXPORTING
+        ztddlistsub_in  = lt_ztddlistsub
+      IMPORTING
+        ztddlistsub_out = lt_xmd.
+*    循环部门列表信息获取用户列表信息
+    CLEAR:gt_userlist_all.
+    LOOP AT lt_xmd ASSIGNING FIELD-SYMBOL(<lt_xmd>).
+      CLEAR:gt_userlist.
+      CALL METHOD me->get_userlist
+        EXPORTING
+          dept_id     = <lt_xmd>-dept_id
+        IMPORTING
+*         rtype       =
+*         rtmsg       =
+          gt_userlist = gt_userlist.
+      APPEND LINES OF gt_userlist TO gt_userlist_all.
+    ENDLOOP.
+*    获取用户详情
+    SORT gt_userlist_all.
+    DELETE ADJACENT DUPLICATES FROM gt_userlist_all COMPARING ALL FIELDS.
+    LOOP AT gt_userlist_all ASSIGNING FIELD-SYMBOL(<gt_userlist_all>).
+      IF <gt_userlist_all> IS NOT INITIAL.
+        CALL METHOD me->get_userinfo
+          EXPORTING
+*           language    = 'zh_CN'
+            userid      = <gt_userlist_all>
+          IMPORTING
+*           rtype       =
+*           rtmsg       =
+            gt_ztdduser = gt_ztdduser.
+
+        APPEND LINES OF gt_ztdduser TO gt_ztdduser_all.
+      ENDIF.
+    ENDLOOP.
+    DELETE gt_ztdduser_all WHERE userid IS INITIAL.
+    IF gt_ztdduser_all IS INITIAL.
+      rtype = 'W'.
+      rtmsg = '无数据'.
+      RETURN.
+    ENDIF.
+    IF init_all = 'X'.
+      DELETE FROM ztdduser.
+      COMMIT WORK AND WAIT.
+    ENDIF.
+    MODIFY ztdduser FROM TABLE gt_ztdduser_all.
+    IF sy-subrc EQ 0.
+      COMMIT WORK AND WAIT.
+      rtype = 'S'.
+      rtmsg = |初始化appname:{ appname }的部门:{ dept_id }员工列表成功，数据已存储在ZTDDUSER表中|.
+    ELSE.
+      ROLLBACK WORK.
+      rtype = 'E'.
+      rtmsg = |初始化appname:{ appname }的部门:{ dept_id }员工列表失败|.
+    ENDIF.
+
   ENDMETHOD.
 ENDCLASS.

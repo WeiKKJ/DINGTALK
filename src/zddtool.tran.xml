@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<abapGit version="v1.0.0" serializer="LCL_OBJECT_TRAN" serializer_version="v1.0.0">
+ <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+  <asx:values>
+   <TSTC>
+    <TCODE>ZDDTOOL</TCODE>
+    <PGMNA>ZDINGTAKLTOOLS</PGMNA>
+    <DYPNO>1000</DYPNO>
+    <CINFO>gA==</CINFO>
+   </TSTC>
+   <TSTCC>
+    <TCODE>ZDDTOOL</TCODE>
+   </TSTCC>
+   <TSTCT>
+    <SPRSL>1</SPRSL>
+    <TCODE>ZDDTOOL</TCODE>
+    <TTEXT>钉钉消息通知工具</TTEXT>
+   </TSTCT>
+  </asx:values>
+ </asx:abap>
+</abapGit>
