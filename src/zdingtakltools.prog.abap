@@ -13,17 +13,15 @@ DATA:rtype TYPE bapi_mtype,
 TYPES: BEGIN OF ty_file,
          line(1024) TYPE x,
        END OF ty_file.
-DATA: gt_file TYPE TABLE OF ty_file.
+DATA:file_xstr TYPE xstring.
 
-DATA: gv_file_name TYPE sdbah-actid,
-      gv_file_type TYPE sdbad-funct,
-      gv_file      TYPE xstring.
 SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE btxt1.
   PARAMETERS:p1 RADIOBUTTON GROUP grd1 DEFAULT 'X' USER-COMMAND ss1,
              p2 RADIOBUTTON GROUP grd1,
              p3 RADIOBUTTON GROUP grd1,
              p4 RADIOBUTTON GROUP grd1,
-             p5 RADIOBUTTON GROUP grd1.
+             p5 RADIOBUTTON GROUP grd1,
+             p6 RADIOBUTTON GROUP grd1.
 
 SELECTION-SCREEN END OF BLOCK b1.
 
@@ -33,10 +31,10 @@ SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME TITLE btxt2.
              p_all    AS CHECKBOX TYPE abap_bool DEFAULT abap_false MEMORY ID pall MODIF ID m5,
              p_userid TYPE ztdduser-userid MEMORY ID pmsgtyp MODIF ID m2,
              p_msgtyp TYPE ze_msgtype MEMORY ID pmsgtype MODIF ID m3,
-             p_title  TYPE string MODIF ID m4,
-             p_text   TYPE string MODIF ID m3,
-             p_file   LIKE rlgrap-filename MEMORY ID pfile MODIF ID m6,
-             p_medid  TYPE string MEMORY ID pmedid MODIF ID m7 LOWER CASE.
+             p_title  TYPE string LOWER CASE MODIF ID m4,
+             p_text   TYPE string LOWER CASE MODIF ID m3,
+             p_file   LIKE ibipparms-path MEMORY ID pfile MODIF ID m6,
+             p_medid  TYPE ze_media_id MEMORY ID pmedid MODIF ID m7 LOWER CASE.
 
 SELECTION-SCREEN END OF BLOCK b2.
 
@@ -66,6 +64,10 @@ AT SELECTION-SCREEN OUTPUT.
       ENDIF.
     ELSEIF p5 = 'X'.
       IF screen-group1 = 'M1' OR screen-group1 = 'M2' OR screen-group1 = 'M3' OR screen-group1 = 'M4' OR screen-group1 = 'M5'  OR screen-group1 = 'M7'.
+        screen-active = 0.
+      ENDIF.
+    ELSEIF p6 = 'X'.
+      IF screen-group1(1) = 'M' AND screen-group1 NE 'M2'.
         screen-active = 0.
       ENDIF.
     ENDIF.
@@ -98,7 +100,8 @@ ENDFORM.
 FORM getdata.
   CLEAR:cl_dingtalk.
   IF p_appid IS INITIAL.
-    MESSAGE e000(oo) WITH '应用唯一标识不能为空'.
+    MESSAGE s000(oo) WITH '应用唯一标识不能为空' DISPLAY LIKE 'E'.
+    LEAVE LIST-PROCESSING.
   ENDIF.
   CREATE OBJECT cl_dingtalk
     EXPORTING
@@ -112,8 +115,13 @@ FORM getdata.
   ELSEIF p4 ='X'.
     PERFORM post2ddrobot.
   ELSEIF p5 = 'X'.
+    CLEAR:p_medid,rtype,rtmsg.
     PERFORM read_upload_file.
-    PERFORM upload_media.
+    PERFORM upload_media USING p_file file_xstr CHANGING p_medid rtype rtmsg.
+    PERFORM inmsg(zpubform) TABLES ret2 USING '' rtype '' rtmsg(50) rtmsg+50(50) rtmsg+100(50) rtmsg+150(50).
+    PERFORM showmsg(zpubform) TABLES ret2.
+  ELSEIF p6 = 'X'.
+    PERFORM post2corpc_excel.
   ELSE.
     EXIT.
   ENDIF.
@@ -292,28 +300,61 @@ ENDFORM.
 *& <--  p2        text
 *&---------------------------------------------------------------------*
 FORM read_upload_file .
-  DATA: lv_file_path   TYPE string,
-        lv_file_length TYPE i,
-        lv_file_name   TYPE dbmsgora-filename.
-
-  lv_file_path = p_file.
-  lv_file_name = p_file.
-
-  CALL FUNCTION 'SPLIT_FILENAME'
+  DATA: file_path   TYPE string,
+        file_length TYPE i,
+        gt_file     TYPE TABLE OF ty_file,
+        result      TYPE abap_bool,
+        info_obj    TYPE obj_record.
+  CONSTANTS:maxlength TYPE i VALUE 20971520.
+  CLEAR:file_xstr.
+  file_path = p_file.
+  " 判断文件是否存在  29.04.2024 09:46:13 by kkw
+  CALL METHOD cl_gui_frontend_services=>file_exist
     EXPORTING
-      long_filename  = lv_file_name "上传文件路径
-    IMPORTING
-      pure_filename  = gv_file_name "文件名称
-      pure_extension = gv_file_type. "文件后缀
-
+      file                 = file_path
+    RECEIVING
+      result               = result
+    EXCEPTIONS
+      cntl_error           = 1
+      error_no_gui         = 2
+      wrong_parameter      = 3
+      not_supported_by_gui = 4
+      OTHERS               = 5.
+  IF sy-subrc NE 0 OR result = abap_false.
+    MESSAGE s000(oo) WITH '所选文件路径有误' DISPLAY LIKE 'E'.
+    LEAVE LIST-PROCESSING.
+  ENDIF.
+  " 计算文件大小  29.04.2024 09:46:29 by kkw
+  CREATE OBJECT info_obj 'SAPINFO' NO FLUSH.
+  CALL METHOD OF info_obj 'GetFileSize' = file_length
+    EXPORTING #1 = file_path.
+  IF file_length GT maxlength.
+    rtmsg = |钉钉要求媒体文件最大不能超过20MB，当前大小为{ file_length / 1048576 }MB|.
+    MESSAGE s000(oo) WITH rtmsg DISPLAY LIKE 'E'.
+    LEAVE LIST-PROCESSING.
+  ENDIF.
+  " 文件上传  29.04.2024 09:52:56 by kkw
   CALL FUNCTION 'GUI_UPLOAD'
     EXPORTING
-      filename                = lv_file_path
+      filename                = file_path
       filetype                = 'BIN'
+*     HAS_FIELD_SEPARATOR     = ' '
+*     HEADER_LENGTH           = 0
+*     READ_BY_LINE            = 'X'
+*     DAT_MODE                = ' '
+*     CODEPAGE                = ' '
+*     IGNORE_CERR             = ABAP_TRUE
+*     REPLACEMENT             = '#'
+*     CHECK_BOM               = ' '
+*     VIRUS_SCAN_PROFILE      =
+*     NO_AUTH_CHECK           = ' '
     IMPORTING
-      filelength              = lv_file_length
+      filelength              = file_length
+*     HEADER                  =
     TABLES
       data_tab                = gt_file
+*   CHANGING
+*     ISSCANPERFORMED         = ' '
     EXCEPTIONS
       file_open_error         = 1
       file_read_error         = 2
@@ -337,19 +378,19 @@ FORM read_upload_file .
     LEAVE LIST-PROCESSING.
   ENDIF.
 
-  "转xstring
+  " BINARY_TO_XSTRING  29.04.2024 09:49:14 by kkw
   CALL FUNCTION 'SCMS_BINARY_TO_XSTRING'
     EXPORTING
-      input_length = lv_file_length
+      input_length = file_length
     IMPORTING
-      buffer       = gv_file
+      buffer       = file_xstr
     TABLES
       binary_tab   = gt_file
     EXCEPTIONS
       failed       = 1
       OTHERS       = 2.
   IF sy-subrc <> 0.
-    MESSAGE s000(oo) WITH '转xstring失败' DISPLAY LIKE 'E'.
+    MESSAGE s000(oo) WITH '文件BINARY转XSTRING失败' DISPLAY LIKE 'E'.
     LEAVE LIST-PROCESSING.
   ENDIF.
 ENDFORM.
@@ -362,7 +403,7 @@ ENDFORM.
 *& -->  p1        text
 *& <--  p2        text
 *&---------------------------------------------------------------------*
-FORM upload_media .
+FORM upload_media USING p_filename p_xstr CHANGING p_media_id p_rtype p_rtmsg.
   DATA:type     TYPE  ze_media_type,
        media    TYPE  xstring,
        media_id TYPE  string.
@@ -371,30 +412,100 @@ FORM upload_media .
          value TYPE string,
        END OF header.
   DATA:lv_content_disposition TYPE string.
-  DATA: lv_file_name   TYPE savwctxt-fieldcont,
-        lv_name_encode TYPE savwctxt-fieldcont.
+  DATA:pure_filename    TYPE char255,
+       pure_extension   TYPE char10,
+       file_name_encode TYPE savwctxt-fieldcont.
   CHECK cl_dingtalk IS BOUND.
-  CLEAR:header,header[].
-  header-name = 'Content-Disposition'.
-  "utf-8编码文件名（目的是让上传后的文件名跟原来一样，不然会乱码）
-  lv_file_name = gv_file_name.
+  CLEAR:p_media_id,p_rtype,p_rtmsg.
+  " 分割文件名和扩展名  29.04.2024 09:47:45 by kkw
+  CALL METHOD zcl_dingtalk=>split_filename
+    EXPORTING
+      long_filename  = CONV char255( p_filename )
+    IMPORTING
+      pure_filename  = pure_filename
+      pure_extension = pure_extension.
+  IF pure_extension IS INITIAL.
+    rtmsg = |文件扩展名有误|.
+    MESSAGE s000(oo) WITH rtmsg DISPLAY LIKE 'E'.
+    LEAVE LIST-PROCESSING.
+  ENDIF.
+  " 中文乱码  29.04.2024 10:06:44 by kkw
   CALL FUNCTION 'WWW_URLENCODE'
     EXPORTING
-      value         = lv_file_name
+      value         = CONV savwctxt-fieldcont( pure_filename )
     IMPORTING
-      value_encoded = lv_name_encode.
-  lv_content_disposition = 'form-data; name="media"; filename="' && lv_file_name && '.' && gv_file_type && '"'.
+      value_encoded = file_name_encode.
+  CLEAR:header,header[].
+  header-name = 'Content-Disposition'.
+  lv_content_disposition = |form-data; name="media"; filename="{ pure_filename }.{ pure_extension }"|.
   header-value = lv_content_disposition.
   APPEND header.
   CALL METHOD cl_dingtalk->upload_media
     EXPORTING
       type     = 'file'
-      media    = gv_file
+      media    = p_xstr
       header   = header[]
     IMPORTING
+      media_id = p_media_id
+      rtype    = p_rtype
+      rtmsg    = p_rtmsg.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form post2corpc_excel
+*&---------------------------------------------------------------------*
+*& 测试调用abap2xlsx生成excel发送工作通知消息
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM post2corpc_excel .
+  IF p_userid IS INITIAL.
+    MESSAGE s000(oo) WITH '员工ID(钉钉的userid)必填' DISPLAY LIKE 'E'.
+    LEAVE LIST-PROCESSING.
+  ENDIF.
+  DATA:media_id TYPE string.
+  TYPES:
+    BEGIN OF ty_excel,
+      excel_tabdref   TYPE REF TO data,
+      excel_fieldcat  TYPE zexcel_t_fieldcatalog,
+      excel_sheetname TYPE zexcel_sheet_title,
+    END OF ty_excel .
+  DATA:exceltab  TYPE TABLE OF ty_excel .
+  SELECT * FROM sflight INTO TABLE @DATA(lt_sflight).
+  INSERT INITIAL LINE INTO TABLE exceltab ASSIGNING FIELD-SYMBOL(<exceltab>).
+  <exceltab>-excel_sheetname = 'lt_sflight'.
+  CREATE DATA <exceltab>-excel_tabdref LIKE lt_sflight.
+  ASSIGN <exceltab>-excel_tabdref->* TO FIELD-SYMBOL(<dref>).
+  <dref> = lt_sflight.
+  <exceltab>-excel_fieldcat = zcl_excel_common=>get_fieldcatalog( ip_table = lt_sflight ).
+
+  SELECT * FROM scarr INTO TABLE @DATA(lt_scarr).
+  INSERT INITIAL LINE INTO TABLE exceltab ASSIGNING <exceltab>.
+  <exceltab>-excel_sheetname = 'lt_scarr'.
+  CREATE DATA <exceltab>-excel_tabdref LIKE lt_scarr.
+  ASSIGN <exceltab>-excel_tabdref->* TO <dref>.
+  <dref> = lt_scarr.
+  <exceltab>-excel_fieldcat = zcl_excel_common=>get_fieldcatalog( ip_table = lt_scarr ).
+  CALL METHOD cl_dingtalk->create_excel
+    EXPORTING
+      gt_exceltab  = exceltab
+    RECEIVING
+      xstring_data = file_xstr.
+  DATA(filename) = |ZDINGTAKLTOOLS_{ sy-datum }_{ sy-uzeit }.xlsx|.
+  CLEAR:media_id,rtype,rtmsg.
+  PERFORM upload_media USING filename file_xstr CHANGING media_id rtype rtmsg.
+  PERFORM inmsg(zpubform) TABLES ret2 USING '' rtype '' rtmsg(50) rtmsg+50(50) rtmsg+100(50) rtmsg+150(50).
+  CALL METHOD cl_dingtalk->post2corpconversation
+    EXPORTING
+      msgtype  = 'file'
+      userid   = p_userid
+*     title    = p_title
+*     text     = p_text
       media_id = media_id
+    IMPORTING
       rtype    = rtype
       rtmsg    = rtmsg.
+*  MESSAGE s000(oo) WITH rtmsg DISPLAY LIKE rtype.
   PERFORM inmsg(zpubform) TABLES ret2 USING '' rtype '' rtmsg(50) rtmsg+50(50) rtmsg+100(50) rtmsg+150(50).
   PERFORM showmsg(zpubform) TABLES ret2.
 ENDFORM.

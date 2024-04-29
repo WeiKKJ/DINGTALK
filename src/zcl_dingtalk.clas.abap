@@ -5,12 +5,21 @@ class ZCL_DINGTALK definition
 
 public section.
 
+  types:
+    BEGIN OF ty_excel,
+        excel_tabdref   TYPE REF TO data,
+        excel_fieldcat  TYPE zexcel_t_fieldcatalog,
+        excel_sheetname TYPE zexcel_sheet_title,
+      END OF ty_excel .
+
   data:
     lt_ztddlistsub TYPE TABLE OF ztddlistsub .
   data:
     lt_userid_list TYPE TABLE OF ztdduser-userid .
   data:
     lt_ztdduser  TYPE TABLE OF ztdduser .
+  data:
+    exceltab  TYPE TABLE OF ty_excel .
 
   methods CONSTRUCTOR
     importing
@@ -45,7 +54,7 @@ public section.
       value(USERID) type ZE_USERID
       value(TITLE) type STRING optional
       value(TEXT) type STRING optional
-      value(MEDIA_ID) type STRING optional
+      value(MEDIA_ID) type ZE_MEDIA_ID optional
       value(DURATION) type I optional
     exporting
       value(RTYPE) type BAPI_MTYPE
@@ -103,6 +112,17 @@ public section.
       !MEDIA_ID type STRING
       value(RTYPE) type BAPI_MTYPE
       value(RTMSG) type BAPI_MSG .
+  methods CREATE_EXCEL
+    importing
+      value(GT_EXCELTAB) like EXCELTAB
+    returning
+      value(XSTRING_DATA) type XSTRING .
+  class-methods SPLIT_FILENAME
+    importing
+      value(LONG_FILENAME) type CHAR255
+    exporting
+      value(PURE_FILENAME) type CHAR255
+      value(PURE_EXTENSION) type CHAR10 .
 protected section.
 private section.
 
@@ -114,6 +134,7 @@ private section.
   constants GET_USER_URL type STRING value `https://oapi.dingtalk.com/topapi/v2/user/get` ##NO_TEXT.
   constants GET_USERLIST_URL type STRING value `https://oapi.dingtalk.com/topapi/user/listid` ##NO_TEXT.
   constants UPLOAD_MEDIA_URL type STRING value `https://oapi.dingtalk.com/media/upload` ##NO_TEXT.
+  constants MAXLENGTH type I value 20971520 ##NO_TEXT.
 
   methods GETTOKEN
     exporting
@@ -149,8 +170,8 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
     DATA:lv_content_disposition TYPE string,
          lv_content_type        TYPE string.
     DATA:long_filename  TYPE char255,
-         pure_filename  TYPE sdbah-actid,
-         pure_extension TYPE sdbad-funct.
+         pure_filename  TYPE char255,
+         pure_extension TYPE char10.
     FIELD-SYMBOLS:<wa>       TYPE any,
                   <fs_name>  TYPE any,
                   <fs_value> TYPE any.
@@ -256,13 +277,12 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
                                      pcre = `\"`
                                      with = ``
                                      occ  = 0 ).
-            CALL FUNCTION 'SPLIT_FILENAME'
+            CALL METHOD zcl_dingtalk=>split_filename
               EXPORTING
                 long_filename  = long_filename
               IMPORTING
                 pure_filename  = pure_filename
                 pure_extension = pure_extension.
-            TRANSLATE pure_extension TO LOWER CASE.
             CASE pure_extension.
               WHEN 'rar'.
                 lv_content_type = 'application/x-rar-compressed'.
@@ -1336,7 +1356,11 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
          otmsg   TYPE string,
          status  TYPE i.
     DATA:access_token TYPE ztddconfig-access_token.
-
+    IF xstrlen( media ) GT maxlength.
+      rtype = 'E'.
+      rtmsg = |钉钉要求媒体文件最大不能超过20MB，当前大小为{ xstrlen( media ) / 1048576 }MB|.
+      RETURN.
+    ENDIF.
     CLEAR:rtype,rtmsg.
 *    获取token  26.04.2024 11:11:45 by kkw
     CALL METHOD me->gettoken
@@ -1373,10 +1397,122 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
       ELSE.
         rtype = 'E'.
       ENDIF.
-      rtmsg = |调用appname:{ appname }上传媒体文件返回信息:{ wa_out-errmsg },errcode:{ wa_out-errcode },media_id:{ wa_out-media_id }状态码:{ status }|.
+      rtmsg = |调用appname:{ appname }上传媒体文件返回信息:{ wa_out-errmsg },errcode:{ wa_out-errcode },media_id:{ wa_out-media_id },状态码:{ status }|.
     ELSE.
       rtype = 'E'.
       rtmsg = |调用appname:{ appname }上传媒体文件发生了问题:{ otmsg },状态码:{ status }|.
+    ENDIF.
+  ENDMETHOD.
+
+
+  METHOD create_excel.
+    DATA: cl_writer TYPE REF TO zif_excel_writer,
+          cl_error  TYPE REF TO zcx_excel.
+    DATA: lo_excel     TYPE REF TO zcl_excel,
+          lo_worksheet TYPE REF TO zcl_excel_worksheet.
+    DATA:ls_table_settings TYPE zexcel_s_table_settings.
+    DATA:lv_count TYPE i,
+         l_col    TYPE zexcel_cell_column_alpha.
+    IF gt_exceltab IS INITIAL.
+      RETURN.
+    ENDIF.
+    " 生成excel的xstring  29.04.2024 16:10:41 by kkw
+    TRY.
+        CREATE OBJECT cl_writer TYPE zcl_excel_writer_2007.
+        " Creates active sheet
+        CREATE OBJECT lo_excel.
+
+        LOOP AT gt_exceltab ASSIGNING FIELD-SYMBOL(<gt_exceltab>).
+          CLEAR:lo_worksheet,ls_table_settings.
+          ASSIGN <gt_exceltab>-excel_tabdref->* TO FIELD-SYMBOL(<tab>).
+          IF <tab> IS NOT ASSIGNED.
+            CONTINUE.
+          ENDIF.
+          IF sy-tabix = 1.
+            " Get active sheet
+            lo_worksheet = lo_excel->get_active_worksheet( ).
+          ELSE.
+            " Add another table
+            lo_worksheet = lo_excel->add_new_worksheet( ).
+          ENDIF.
+          lo_worksheet->set_title( <gt_exceltab>-excel_sheetname ).
+          IF <gt_exceltab>-excel_fieldcat IS INITIAL.
+            <gt_exceltab>-excel_fieldcat = zcl_excel_common=>get_fieldcatalog( ip_table = <tab> ).
+          ENDIF.
+          ls_table_settings-table_style  = zcl_excel_table=>builtinstyle_medium5.
+
+          lo_worksheet->bind_table( ip_table          = <tab>
+                                    is_table_settings = ls_table_settings
+                                    it_field_catalog  = <gt_exceltab>-excel_fieldcat ).
+          "自动列宽
+          lv_count = 1.
+          LOOP AT <gt_exceltab>-excel_fieldcat INTO DATA(ls_field_catalog) WHERE dynpfld = 'X'.
+            zcl_excel_common=>convert_column2alpha(
+              EXPORTING
+                ip_column = lv_count
+              RECEIVING
+                ep_column = l_col
+            ).
+            DATA(lo_column) = lo_worksheet->get_column( l_col ).
+            lo_column->set_auto_size( ip_auto_size = abap_true ).
+            ADD 1 TO lv_count.
+          ENDLOOP.
+          lo_worksheet->calculate_column_widths( ).
+        ENDLOOP.
+        xstring_data = cl_writer->write_file( lo_excel ).
+        FREE lo_excel.
+      CATCH zcx_excel INTO cl_error.
+        EXIT.
+    ENDTRY.
+  ENDMETHOD.
+
+
+  METHOD split_filename.
+    DATA: len             TYPE i,
+          len_f           TYPE i,
+          pos             TYPE i,
+          char            TYPE c,
+          long_filename_f TYPE dbmsgora-filename.
+    " 找扩展名  29.04.2024 19:56:14 by kkw
+    len = strlen( long_filename ).
+    CHECK len GT 0.
+    pos = len.
+    DO len TIMES.
+      pos = pos - 1.
+      char = long_filename+pos(1).
+      IF char ='.'.
+        len = len - pos.
+        pos = pos + 1.
+        pure_extension = long_filename+pos(len).
+        TRANSLATE pure_extension TO LOWER CASE.
+        EXIT.
+      ENDIF.
+    ENDDO.
+    " 找文件名  29.04.2024 19:56:56 by kkw
+    IF pure_extension IS INITIAL.
+      len_f = len.
+    ELSE.
+      len_f = strlen( long_filename ) - strlen( pure_extension ) - 1.
+    ENDIF.
+
+    long_filename_f = long_filename(len_f).
+    pos = len_f.
+    DO len_f TIMES.
+      pos = pos - 1.
+      char = long_filename_f+pos(1).
+      IF char = '\' OR char = '/'.
+        len_f = len_f - pos.
+        pos = pos + 1.
+        pure_filename = long_filename_f+pos(len_f).
+        EXIT.
+      ENDIF.
+    ENDDO.
+    IF pure_filename IS INITIAL.
+      IF pure_extension IS INITIAL.
+        pure_filename = long_filename.
+      ELSE.
+        pure_filename = long_filename(len_f).
+      ENDIF.
     ENDIF.
   ENDMETHOD.
 ENDCLASS.

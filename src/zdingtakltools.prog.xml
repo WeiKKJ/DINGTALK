@@ -47,6 +47,12 @@
     </item>
     <item>
      <ID>S</ID>
+     <KEY>P6</KEY>
+     <ENTRY>测试上传钉钉excel文件</ENTRY>
+     <LENGTH>21</LENGTH>
+    </item>
+    <item>
+     <ID>S</ID>
      <KEY>P_ALL</KEY>
      <ENTRY>完全初始化</ENTRY>
      <LENGTH>13</LENGTH>
