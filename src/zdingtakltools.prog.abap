@@ -256,7 +256,7 @@ FORM post2corpconversation .
   CALL METHOD cl_dingtalk->post2corpconversation
     EXPORTING
       msgtype  = p_msgtyp
-      userid   = p_userid
+      userid   = CONV string( p_userid )
       title    = p_title
       text     = p_text
       media_id = p_medid
@@ -329,7 +329,7 @@ FORM read_upload_file .
   CALL METHOD OF info_obj 'GetFileSize' = file_length
     EXPORTING #1 = file_path.
   IF file_length GT maxlength.
-    rtmsg = |钉钉要求媒体文件最大不能超过20MB，当前大小为{ file_length / 1048576 }MB|.
+    rtmsg = |钉钉要求媒体文件最大不能超过{ maxlength / 1048576 }MB，当前大小为{ file_length / 1048576 }MB|.
     MESSAGE s000(oo) WITH rtmsg DISPLAY LIKE 'E'.
     LEAVE LIST-PROCESSING.
   ENDIF.
@@ -425,9 +425,9 @@ FORM upload_media USING p_filename p_xstr CHANGING p_media_id p_rtype p_rtmsg.
       pure_filename  = pure_filename
       pure_extension = pure_extension.
   IF pure_extension IS INITIAL.
-    rtmsg = |文件扩展名有误|.
-    MESSAGE s000(oo) WITH rtmsg DISPLAY LIKE 'E'.
-    LEAVE LIST-PROCESSING.
+    p_rtmsg = |文件扩展名有误|.
+    p_rtype = 'E'.
+    RETURN.
   ENDIF.
   " 中文乱码  29.04.2024 10:06:44 by kkw
   CALL FUNCTION 'WWW_URLENCODE'
@@ -464,13 +464,7 @@ FORM post2corpc_excel .
     LEAVE LIST-PROCESSING.
   ENDIF.
   DATA:media_id TYPE string.
-  TYPES:
-    BEGIN OF ty_excel,
-      excel_tabdref   TYPE REF TO data,
-      excel_fieldcat  TYPE zexcel_t_fieldcatalog,
-      excel_sheetname TYPE zexcel_sheet_title,
-    END OF ty_excel .
-  DATA:exceltab  TYPE TABLE OF ty_excel .
+  DATA:exceltab LIKE zcl_dingtalk=>exceltab.
   SELECT * FROM sflight INTO TABLE @DATA(lt_sflight).
   INSERT INITIAL LINE INTO TABLE exceltab ASSIGNING FIELD-SYMBOL(<exceltab>).
   <exceltab>-excel_sheetname = 'lt_sflight'.
@@ -480,6 +474,7 @@ FORM post2corpc_excel .
   <exceltab>-excel_fieldcat = zcl_excel_common=>get_fieldcatalog( ip_table = lt_sflight ).
 
   SELECT * FROM scarr INTO TABLE @DATA(lt_scarr).
+  UNASSIGN:<exceltab>,<dref>.
   INSERT INITIAL LINE INTO TABLE exceltab ASSIGNING <exceltab>.
   <exceltab>-excel_sheetname = 'lt_scarr'.
   CREATE DATA <exceltab>-excel_tabdref LIKE lt_scarr.
@@ -495,17 +490,20 @@ FORM post2corpc_excel .
   CLEAR:media_id,rtype,rtmsg.
   PERFORM upload_media USING filename file_xstr CHANGING media_id rtype rtmsg.
   PERFORM inmsg(zpubform) TABLES ret2 USING '' rtype '' rtmsg(50) rtmsg+50(50) rtmsg+100(50) rtmsg+150(50).
-  CALL METHOD cl_dingtalk->post2corpconversation
-    EXPORTING
-      msgtype  = 'file'
-      userid   = p_userid
-*     title    = p_title
-*     text     = p_text
-      media_id = media_id
-    IMPORTING
-      rtype    = rtype
-      rtmsg    = rtmsg.
+  IF media_id IS NOT INITIAL.
+    CLEAR:rtype,rtmsg.
+    CALL METHOD cl_dingtalk->post2corpconversation
+      EXPORTING
+        msgtype  = 'file'
+        userid   = CONV string( p_userid )
+*       title    = p_title
+*       text     = p_text
+        media_id = media_id
+      IMPORTING
+        rtype    = rtype
+        rtmsg    = rtmsg.
 *  MESSAGE s000(oo) WITH rtmsg DISPLAY LIKE rtype.
-  PERFORM inmsg(zpubform) TABLES ret2 USING '' rtype '' rtmsg(50) rtmsg+50(50) rtmsg+100(50) rtmsg+150(50).
+    PERFORM inmsg(zpubform) TABLES ret2 USING '' rtype '' rtmsg(50) rtmsg+50(50) rtmsg+100(50) rtmsg+150(50).
+  ENDIF.
   PERFORM showmsg(zpubform) TABLES ret2.
 ENDFORM.

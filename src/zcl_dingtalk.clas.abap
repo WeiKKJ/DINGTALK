@@ -12,13 +12,13 @@ public section.
         excel_sheetname TYPE zexcel_sheet_title,
       END OF ty_excel .
 
-  data:
+  class-data:
     lt_ztddlistsub TYPE TABLE OF ztddlistsub .
-  data:
+  class-data:
     lt_userid_list TYPE TABLE OF ztdduser-userid .
-  data:
+  class-data:
     lt_ztdduser  TYPE TABLE OF ztdduser .
-  data:
+  class-data:
     exceltab  TYPE TABLE OF ty_excel .
 
   methods CONSTRUCTOR
@@ -40,6 +40,17 @@ public section.
       value(OUTPUT) type STRING
       value(RTMSG) type STRING
       value(STATUS) type I .
+  class-methods SPLIT_FILENAME
+    importing
+      value(LONG_FILENAME) type CHAR255
+    exporting
+      value(PURE_FILENAME) type CHAR255
+      value(PURE_EXTENSION) type CHAR10 .
+  class-methods CREATE_EXCEL
+    importing
+      value(GT_EXCELTAB) like EXCELTAB
+    returning
+      value(XSTRING_DATA) type XSTRING .
   methods POST2DDROBOT
     importing
       value(MSGTYPE) type ZE_MSGTYPE default 'text'
@@ -51,7 +62,7 @@ public section.
   methods POST2CORPCONVERSATION
     importing
       value(MSGTYPE) type ZE_MSGTYPE default 'text'
-      value(USERID) type ZE_USERID
+      value(USERID) type STRING
       value(TITLE) type STRING optional
       value(TEXT) type STRING optional
       value(MEDIA_ID) type ZE_MEDIA_ID optional
@@ -59,29 +70,6 @@ public section.
     exporting
       value(RTYPE) type BAPI_MTYPE
       value(RTMSG) type BAPI_MSG .
-  methods GET_USERINFO
-    importing
-      value(LANGUAGE) type CHAR5 default 'zh_CN'
-      value(USERID) type ZE_USERID
-    exporting
-      value(RTYPE) type BAPI_MTYPE
-      value(RTMSG) type BAPI_MSG
-      value(GT_ZTDDUSER) like LT_ZTDDUSER .
-  methods GET_DEPT
-    importing
-      value(DEPT_ID) type ZE_DEPT_ID default 1
-      value(LANGUAGE) type CHAR5 default 'zh_CN'
-    exporting
-      value(RTYPE) type BAPI_MTYPE
-      value(RTMSG) type BAPI_MSG
-      value(GT_ZTDDLISTSUB) like LT_ZTDDLISTSUB .
-  methods GET_USERLIST
-    importing
-      value(DEPT_ID) type ZE_DEPT_ID
-    exporting
-      value(RTYPE) type BAPI_MTYPE
-      value(RTMSG) type BAPI_MSG
-      value(GT_USERLIST) like LT_USERID_LIST .
   methods INIT_DEPT
     importing
       value(DEPT_ID) type ZE_DEPT_ID default 1
@@ -98,11 +86,6 @@ public section.
     exporting
       value(RTYPE) type BAPI_MTYPE
       value(RTMSG) type BAPI_MSG .
-  methods GET_DEPTSUBALL
-    importing
-      value(ZTDDLISTSUB_IN) like LT_ZTDDLISTSUB
-    exporting
-      !ZTDDLISTSUB_OUT like LT_ZTDDLISTSUB .
   methods UPLOAD_MEDIA
     importing
       value(TYPE) type ZE_MEDIA_TYPE
@@ -112,17 +95,6 @@ public section.
       !MEDIA_ID type STRING
       value(RTYPE) type BAPI_MTYPE
       value(RTMSG) type BAPI_MSG .
-  methods CREATE_EXCEL
-    importing
-      value(GT_EXCELTAB) like EXCELTAB
-    returning
-      value(XSTRING_DATA) type XSTRING .
-  class-methods SPLIT_FILENAME
-    importing
-      value(LONG_FILENAME) type CHAR255
-    exporting
-      value(PURE_FILENAME) type CHAR255
-      value(PURE_EXTENSION) type CHAR10 .
 protected section.
 private section.
 
@@ -136,6 +108,34 @@ private section.
   constants UPLOAD_MEDIA_URL type STRING value `https://oapi.dingtalk.com/media/upload` ##NO_TEXT.
   constants MAXLENGTH type I value 20971520 ##NO_TEXT.
 
+  methods GET_DEPTSUBALL
+    importing
+      value(ZTDDLISTSUB_IN) like LT_ZTDDLISTSUB
+    exporting
+      !ZTDDLISTSUB_OUT like LT_ZTDDLISTSUB .
+  methods GET_USERLIST
+    importing
+      value(DEPT_ID) type ZE_DEPT_ID
+    exporting
+      value(RTYPE) type BAPI_MTYPE
+      value(RTMSG) type BAPI_MSG
+      value(GT_USERLIST) like LT_USERID_LIST .
+  methods GET_DEPT
+    importing
+      value(DEPT_ID) type ZE_DEPT_ID default 1
+      value(LANGUAGE) type CHAR5 default 'zh_CN'
+    exporting
+      value(RTYPE) type BAPI_MTYPE
+      value(RTMSG) type BAPI_MSG
+      value(GT_ZTDDLISTSUB) like LT_ZTDDLISTSUB .
+  methods GET_USERINFO
+    importing
+      value(LANGUAGE) type CHAR5 default 'zh_CN'
+      value(USERID) type ZE_USERID
+    exporting
+      value(RTYPE) type BAPI_MTYPE
+      value(RTMSG) type BAPI_MSG
+      value(GT_ZTDDUSER) like LT_ZTDDUSER .
   methods GETTOKEN
     exporting
       value(RTYPE) type BAPI_MTYPE
@@ -283,6 +283,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
               IMPORTING
                 pure_filename  = pure_filename
                 pure_extension = pure_extension.
+
             CASE pure_extension.
               WHEN 'rar'.
                 lv_content_type = 'application/x-rar-compressed'.
@@ -1358,7 +1359,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
     DATA:access_token TYPE ztddconfig-access_token.
     IF xstrlen( media ) GT maxlength.
       rtype = 'E'.
-      rtmsg = |钉钉要求媒体文件最大不能超过20MB，当前大小为{ xstrlen( media ) / 1048576 }MB|.
+      rtmsg = |钉钉要求媒体文件最大不能超过{ maxlength / 1048576 }MB，当前大小为{ xstrlen( media ) / 1048576 }MB|.
       RETURN.
     ENDIF.
     CLEAR:rtype,rtmsg.
@@ -1405,7 +1406,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
   ENDMETHOD.
 
 
-  METHOD create_excel.
+  METHOD CREATE_EXCEL.
     DATA: cl_writer TYPE REF TO zif_excel_writer,
           cl_error  TYPE REF TO zcx_excel.
     DATA: lo_excel     TYPE REF TO zcl_excel,
@@ -1467,7 +1468,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
   ENDMETHOD.
 
 
-  METHOD split_filename.
+  METHOD SPLIT_FILENAME.
     DATA: len             TYPE i,
           len_f           TYPE i,
           pos             TYPE i,
