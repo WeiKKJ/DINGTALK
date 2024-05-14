@@ -10,9 +10,6 @@ DATA:cl_dingtalk TYPE REF TO zcl_dingtalk,
 DATA:rtype TYPE bapi_mtype,
      rtmsg TYPE bapi_msg,
      ret2  TYPE TABLE OF bapiret2.
-TYPES: BEGIN OF ty_file,
-         line(1024) TYPE x,
-       END OF ty_file.
 DATA:file_xstr TYPE xstring.
 
 SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE btxt1.
@@ -300,6 +297,9 @@ ENDFORM.
 *& <--  p2        text
 *&---------------------------------------------------------------------*
 FORM read_upload_file .
+  TYPES: BEGIN OF ty_file,
+           line(1024) TYPE x,
+         END OF ty_file.
   DATA: file_path   TYPE string,
         file_length TYPE i,
         gt_file     TYPE TABLE OF ty_file,
@@ -342,7 +342,7 @@ FORM read_upload_file .
 *     HEADER_LENGTH           = 0
 *     READ_BY_LINE            = 'X'
 *     DAT_MODE                = ' '
-*     CODEPAGE                = ' '
+      codepage                = '8400'
 *     IGNORE_CERR             = ABAP_TRUE
 *     REPLACEMENT             = '#'
 *     CHECK_BOM               = ' '
@@ -373,6 +373,36 @@ FORM read_upload_file .
       disk_full               = 15
       dp_timeout              = 16
       OTHERS                  = 17.
+
+*  cl_gui_frontend_services=>gui_upload( EXPORTING
+*                                          filename                = file_path
+*                                          filetype                = 'BIN'         " We are basically working with zipped directories --> force binary read
+**                                            codepage                = codepage
+*                                        IMPORTING
+*                                          filelength              = file_length
+*                                        CHANGING
+*                                          data_tab                = gt_file
+*                                        EXCEPTIONS
+*                                          file_open_error         = 1
+*                                          file_read_error         = 2
+*                                          no_batch                = 3
+*                                          gui_refuse_filetransfer = 4
+*                                          invalid_type            = 5
+*                                          no_authority            = 6
+*                                          unknown_error           = 7
+*                                          bad_data_format         = 8
+*                                          header_not_allowed      = 9
+*                                          separator_not_allowed   = 10
+*                                          header_too_long         = 11
+*                                          unknown_dp_error        = 12
+*                                          access_denied           = 13
+*                                          dp_out_of_memory        = 14
+*                                          disk_full               = 15
+*                                          dp_timeout              = 16
+*                                          not_supported_by_gui    = 17
+*                                          error_no_gui            = 18
+*                                          OTHERS                  = 19 ).
+
   IF sy-subrc <> 0.
     MESSAGE s000(oo) WITH '上传文件失败' DISPLAY LIKE 'E'.
     LEAVE LIST-PROCESSING.

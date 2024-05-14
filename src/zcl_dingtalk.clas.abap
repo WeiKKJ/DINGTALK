@@ -107,6 +107,7 @@ private section.
   constants GET_USERLIST_URL type STRING value `https://oapi.dingtalk.com/topapi/user/listid` ##NO_TEXT.
   constants UPLOAD_MEDIA_URL type STRING value `https://oapi.dingtalk.com/media/upload` ##NO_TEXT.
   constants MAXLENGTH type I value 20971520 ##NO_TEXT.
+  data MY_LOGGER type ref to ZIF_LOGGER .
 
   methods GET_DEPTSUBALL
     importing
@@ -243,6 +244,8 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
       WHEN 'JSON'.
         http_object->request->set_header_field( name = 'Content-Type' value = 'application/json;charset=utf-8' ).
       WHEN 'FORM-DATA'.
+*        http_object->request->set_header_field( name = 'charset' value = 'UTF-8' ).
+*        http_object->request->set_header_field( name = 'accept-language' value = 'zh-CN' ).
         http_object->request->set_header_field( name = 'Content-Type' value = 'multipart/form-data' ).
         http_entity = http_object->request->if_http_entity~add_multipart( ).
     ENDCASE.
@@ -272,7 +275,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
                          occ  = 0 ) ) AT `;` INTO TABLE DATA(lt_split).
 
         LOOP AT lt_split ASSIGNING FIELD-SYMBOL(<lt_split>).
-          IF <lt_split>(8) = 'filename'.
+          IF <lt_split>(8) = 'filename' AND <lt_split>(9) NE 'filename*'.
             long_filename = replace( val  = <lt_split>+9
                                      pcre = `\"`
                                      with = ``
@@ -446,7 +449,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
         IF ( minutes * 60 ) LT ( wa_conf-expires_in - 10 ).
           access_token = wa_conf-access_token.
           rtype = 'S'.
-          rtmsg = '成功'.
+          rtmsg = |成功获取{ appname }的access_token缓存|.
           RETURN.
         ENDIF.
       ENDIF.
@@ -483,10 +486,10 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
       ELSE.
         rtype = 'E'.
       ENDIF.
-      rtmsg = |调用{ appid }获取access_token返回信息:{ wa_token-errmsg }，状态码:{ status }|.
+      rtmsg = |获取{ appname }的access_token返回信息:{ wa_token-errmsg }，状态码:{ status }|.
     ELSE.
       rtype = 'E'.
-      rtmsg = |调用{ appid }获取access_token发生了问题:{ otmsg }，状态码:{ status }|.
+      rtmsg = |调用{ appname }的access_token发生了问题:{ otmsg }，状态码:{ status }|.
     ENDIF.
 
   ENDMETHOD.
@@ -906,6 +909,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
         IF text IS INITIAL.
           rtype = 'E'.
           rtmsg = |消息类型{ msgtype }的text不能为空|.
+          me->my_logger->e( obj_to_log = rtmsg ) .
           RETURN.
         ENDIF.
         wa_in-msg-text-content = text.
@@ -913,6 +917,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
         IF text IS INITIAL OR title IS INITIAL.
           rtype = 'E'.
           rtmsg = |消息类型{ msgtype }的title和text均不能为空|.
+          me->my_logger->e( obj_to_log = rtmsg ) .
           RETURN.
         ENDIF.
         wa_in-msg-markdown-title = title.
@@ -927,6 +932,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
       WHEN OTHERS.
         rtype = 'E'.
         rtmsg = |当前版本尚未添加对消息类型{ msgtype }的支持|.
+        me->my_logger->e( obj_to_log = rtmsg ) .
         RETURN.
     ENDCASE.
 *    获取token  26.04.2024 11:11:45 by kkw
@@ -936,6 +942,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
         rtmsg        = rtmsg
         access_token = access_token
         agentid      = wa_in-agent_id.
+    me->my_logger->i( obj_to_log = rtmsg ) .
     IF rtype NE 'S'.
       RETURN.
     ENDIF.
@@ -963,15 +970,18 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
         status    = status.
     IF status EQ 200.
       /ui2/cl_json=>deserialize( EXPORTING json = out_put pretty_name = /ui2/cl_json=>pretty_mode-low_case CHANGING data = wa_out ).
+      rtmsg = |调用工作通知:{ appname }发送消息返回信息:errcode:{ wa_out-errcode },errmsg:{ wa_out-errmsg },task_id:{ wa_out-task_id },request_id:{ wa_out-request_id },状态码:{ status }|.
       IF wa_out-errcode EQ 0.
         rtype = 'S'.
+        me->my_logger->s( obj_to_log = rtmsg ) .
       ELSE.
         rtype = 'E'.
+        me->my_logger->e( obj_to_log = rtmsg ) .
       ENDIF.
-      rtmsg = |调用工作通知:{ appname }发送消息返回信息:errcode:{ wa_out-errcode },errmsg:{ wa_out-errmsg },task_id:{ wa_out-task_id },request_id:{ wa_out-request_id },状态码:{ status }|.
     ELSE.
       rtype = 'E'.
       rtmsg = |调用工作通知:{ appname }发送消息发生了问题:{ otmsg },状态码:{ status }|.
+      me->my_logger->e( obj_to_log = rtmsg ) .
     ENDIF.
 
   ENDMETHOD.
@@ -1054,6 +1064,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
         IF text IS INITIAL.
           rtype = 'E'.
           rtmsg = |消息类型{ msgtype }的text不能为空|.
+          me->my_logger->e( obj_to_log = rtmsg ) .
           RETURN.
         ENDIF.
         wa_in-text-content = text.
@@ -1061,6 +1072,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
         IF text IS INITIAL OR title IS INITIAL.
           rtype = 'E'.
           rtmsg = |消息类型{ msgtype }的title和text均不能为空|.
+          me->my_logger->e( obj_to_log = rtmsg ) .
           RETURN.
         ENDIF.
         wa_in-markdown-title = title.
@@ -1068,17 +1080,20 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
       WHEN OTHERS.
         rtype = 'E'.
         rtmsg = |当前版本尚未添加对消息类型{ msgtype }的支持|.
+        me->my_logger->e( obj_to_log = rtmsg ) .
         RETURN.
     ENDCASE.
     SELECT SINGLE * FROM ztddconfig WHERE appid = @appid INTO @DATA(wa_conf).
     IF sy-subrc NE 0.
       rtype = 'E'.
       rtmsg = |发送钉钉群机器人消息,请配置ztddconfig表appid:{ appid }信息|.
+      me->my_logger->e( obj_to_log = rtmsg ) .
       RETURN.
     ELSE.
       IF wa_conf-webhook IS INITIAL OR wa_conf-secret IS INITIAL.
         rtype = 'E'.
         rtmsg = |发送钉钉群机器人消息,请配置ztddconfig表appid:{ appid }的webhook和secret信息|.
+        me->my_logger->e( obj_to_log = rtmsg ) .
         RETURN.
       ENDIF.
     ENDIF.
@@ -1092,6 +1107,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
     IF sign IS INITIAL.
       rtype = 'E'.
       rtmsg = '获取签名失败'.
+      me->my_logger->e( obj_to_log = rtmsg ) .
       RETURN.
     ENDIF.
     url = |{ wa_conf-webhook }&timestamp={ timestamp }&sign={ sign }|.
@@ -1114,15 +1130,18 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
 
     IF status EQ 200.
       /ui2/cl_json=>deserialize( EXPORTING json = out_put  pretty_name = /ui2/cl_json=>pretty_mode-low_case CHANGING data = wa_out ).
+      rtmsg = |调用钉钉群机器人:{ appname }发送消息返回信息:errcode:{ wa_out-errcode },errmsg:{ wa_out-errmsg },状态码:{ status }|.
       IF wa_out-errcode EQ 0.
         rtype = 'S'.
+        me->my_logger->s( obj_to_log = rtmsg ) .
       ELSE.
         rtype = 'E'.
+        me->my_logger->e( obj_to_log = rtmsg ) .
       ENDIF.
-      rtmsg = |调用钉钉群机器人:{ appname }发送消息返回信息:errcode:{ wa_out-errcode },errmsg:{ wa_out-errmsg },状态码:{ status }|.
     ELSE.
       rtype = 'E'.
       rtmsg = |调用钉钉群机器人:{ appname }发送消息发生了问题:{ otmsg },状态码:{ status }|.
+      me->my_logger->e( obj_to_log = rtmsg ) .
     ENDIF.
 
   ENDMETHOD.
@@ -1131,6 +1150,12 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
   METHOD constructor.
     me->appid = appid.
     SELECT SINGLE name FROM ztddconfig WHERE appid = @appid INTO @me->appname.
+    me->my_logger = zcl_logger_factory=>create_log(
+                        object    = 'ZDINGTALK'
+                        subobject = 'ZDT'
+                        desc      = 'ZCL_DINGTALK'
+                        settings = zcl_logger_factory=>create_settings( ) ) ##no_text.
+
   ENDMETHOD.
 
 
@@ -1218,6 +1243,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
         rtype          = rtype
         rtmsg          = rtmsg
         gt_ztddlistsub = gt_ztddlistsub.
+    me->my_logger->i( obj_to_log = rtmsg ) .
     CHECK rtype = 'S'.
 
     APPEND LINES OF gt_ztddlistsub TO gt_ztddlistsub_total.
@@ -1239,16 +1265,19 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
     IF init_all = 'X'.
       DELETE FROM ztddlistsub.
       COMMIT WORK AND WAIT.
+      me->my_logger->s( obj_to_log = |清空ztddlistsub底表数据成功| ) .
     ENDIF.
     MODIFY ztddlistsub FROM TABLE gt_ztddlistsub_total.
     IF sy-subrc EQ 0.
       COMMIT WORK AND WAIT.
       rtype = 'S'.
       rtmsg = |初始化appname:{ appname }的部门:{ dept_id }列表成功，数据已存储在ZTDDLISTSUB表中|.
+      me->my_logger->s( obj_to_log = rtmsg ) .
     ELSE.
       ROLLBACK WORK.
       rtype = 'E'.
       rtmsg = |初始化appname:{ appname }的部门:{ dept_id }列表失败|.
+      me->my_logger->e( obj_to_log = rtmsg ) .
     ENDIF.
 
   ENDMETHOD.
@@ -1271,6 +1300,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
     IF lt_xmd IS INITIAL.
       rtype = 'E'.
       rtmsg = |表ZTDDLISTSUB未获取到DEPT_ID为{ dept_id }的数据，获取部门列表后再试|.
+      me->my_logger->e( obj_to_log = rtmsg ) .
       RETURN.
     ENDIF.
 
@@ -1321,21 +1351,25 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
     IF gt_ztdduser_all IS INITIAL.
       rtype = 'W'.
       rtmsg = '无数据'.
+      me->my_logger->w( obj_to_log = rtmsg ) .
       RETURN.
     ENDIF.
     IF init_all = 'X'.
       DELETE FROM ztdduser.
       COMMIT WORK AND WAIT.
+      me->my_logger->s( obj_to_log = |清空ztdduser底表数据成功| ) .
     ENDIF.
     MODIFY ztdduser FROM TABLE gt_ztdduser_all.
     IF sy-subrc EQ 0.
       COMMIT WORK AND WAIT.
       rtype = 'S'.
       rtmsg = |初始化appname:{ appname }的部门:{ dept_id }员工列表成功，数据已存储在ZTDDUSER表中|.
+      me->my_logger->s( obj_to_log = rtmsg ) .
     ELSE.
       ROLLBACK WORK.
       rtype = 'E'.
       rtmsg = |初始化appname:{ appname }的部门:{ dept_id }员工列表失败|.
+      me->my_logger->e( obj_to_log = rtmsg ) .
     ENDIF.
 
   ENDMETHOD.
@@ -1360,6 +1394,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
     IF xstrlen( media ) GT maxlength.
       rtype = 'E'.
       rtmsg = |钉钉要求媒体文件最大不能超过{ maxlength / 1048576 }MB，当前大小为{ xstrlen( media ) / 1048576 }MB|.
+      me->my_logger->e( obj_to_log = rtmsg ) .
       RETURN.
     ENDIF.
     CLEAR:rtype,rtmsg.
@@ -1369,6 +1404,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
         rtype        = rtype
         rtmsg        = rtmsg
         access_token = access_token.
+    me->my_logger->i( obj_to_log = rtmsg ) .
     IF rtype NE 'S'.
       RETURN.
     ENDIF.
@@ -1392,16 +1428,19 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
 
     IF status EQ 200.
       /ui2/cl_json=>deserialize( EXPORTING json = out_put pretty_name = /ui2/cl_json=>pretty_mode-low_case CHANGING data = wa_out ).
+      rtmsg = |调用appname:{ appname }上传媒体文件返回信息:{ wa_out-errmsg },errcode:{ wa_out-errcode },media_id:{ wa_out-media_id },状态码:{ status }|.
       IF wa_out-errcode EQ 0.
         rtype = 'S'.
         media_id = wa_out-media_id.
+        me->my_logger->s( obj_to_log = rtmsg ) .
       ELSE.
         rtype = 'E'.
+        me->my_logger->e( obj_to_log = rtmsg ) .
       ENDIF.
-      rtmsg = |调用appname:{ appname }上传媒体文件返回信息:{ wa_out-errmsg },errcode:{ wa_out-errcode },media_id:{ wa_out-media_id },状态码:{ status }|.
     ELSE.
       rtype = 'E'.
       rtmsg = |调用appname:{ appname }上传媒体文件发生了问题:{ otmsg },状态码:{ status }|.
+      me->my_logger->e( obj_to_log = rtmsg ) .
     ENDIF.
   ENDMETHOD.
 
