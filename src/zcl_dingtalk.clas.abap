@@ -112,6 +112,7 @@ private section.
   methods GET_DEPTSUBALL
     importing
       value(ZTDDLISTSUB_IN) like LT_ZTDDLISTSUB
+      value(ACTION) type CHAR3 default 'GET'
     exporting
       !ZTDDLISTSUB_OUT like LT_ZTDDLISTSUB .
   methods GET_USERLIST
@@ -1210,23 +1211,51 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
 
   METHOD get_deptsuball.
     DATA:lt_tab TYPE TABLE OF ztddlistsub.
+    DATA:lt_tab_sub TYPE TABLE OF ztddlistsub.
     CHECK ztddlistsub_in IS NOT INITIAL.
-    SELECT
-      *
-      FROM ztddlistsub
-      FOR ALL ENTRIES IN @ztddlistsub_in
-      WHERE parent_id = @ztddlistsub_in-dept_id
-      AND dept_id IS NOT INITIAL
-      APPENDING TABLE @lt_tab
-      .
-    CHECK lt_tab IS NOT INITIAL.
-    APPEND LINES OF lt_tab TO ztddlistsub_out.
-    CALL METHOD me->get_deptsuball
-      EXPORTING
-        ztddlistsub_in  = lt_tab
-      IMPORTING
-        ztddlistsub_out = ztddlistsub_out.
-
+    CASE action.
+      WHEN 'GET'.
+        SELECT
+          *
+          FROM ztddlistsub
+          FOR ALL ENTRIES IN @ztddlistsub_in
+          WHERE parent_id = @ztddlistsub_in-dept_id
+          AND dept_id IS NOT INITIAL
+          APPENDING TABLE @lt_tab
+          .
+        CHECK lt_tab IS NOT INITIAL.
+        APPEND LINES OF lt_tab TO ztddlistsub_out.
+        CALL METHOD me->get_deptsuball
+          EXPORTING
+            ztddlistsub_in  = lt_tab
+          IMPORTING
+            ztddlistsub_out = ztddlistsub_out.
+      WHEN 'UPD'.
+        LOOP AT ztddlistsub_in ASSIGNING FIELD-SYMBOL(<ztddlistsub_in>).
+          CLEAR:lt_tab.
+          CALL METHOD me->get_dept
+            EXPORTING
+              dept_id        = <ztddlistsub_in>-dept_id
+*             language       = 'zh_CN'
+            IMPORTING
+*             rtype          =
+*             rtmsg          =
+              gt_ztddlistsub = lt_tab.
+          IF lt_tab IS NOT INITIAL.
+            APPEND LINES OF lt_tab TO ztddlistsub_out.
+            CLEAR:lt_tab_sub.
+            CALL METHOD me->get_deptsuball
+              EXPORTING
+                ztddlistsub_in  = lt_tab
+                action          = 'UPD'
+              IMPORTING
+                ztddlistsub_out = lt_tab_sub.
+            IF lt_tab_sub IS NOT INITIAL.
+              APPEND LINES OF lt_tab_sub TO ztddlistsub_out.
+            ENDIF.
+          ENDIF.
+        ENDLOOP.
+    ENDCASE.
   ENDMETHOD.
 
 
@@ -1248,20 +1277,28 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
 
     APPEND LINES OF gt_ztddlistsub TO gt_ztddlistsub_total.
 *    循环获取所有下级部门列表  26.04.2024 10:40:31 by kkw
-    LOOP AT gt_ztddlistsub ASSIGNING FIELD-SYMBOL(<gt_ztddlistsub>).
-      CLEAR:rtype,rtmsg,gt_ztddlistsub_sub.
-      CALL METHOD me->get_dept
-        EXPORTING
-          dept_id        = <gt_ztddlistsub>-dept_id
-*         language       = 'zh_CN'
-        IMPORTING
-*         rtype          = rtype
-*         rtmsg          = rtmsg
-          gt_ztddlistsub = gt_ztddlistsub_sub.
-      IF gt_ztddlistsub_sub IS NOT INITIAL.
-        APPEND LINES OF gt_ztddlistsub_sub TO gt_ztddlistsub_total.
-      ENDIF.
-    ENDLOOP.
+    CALL METHOD me->get_deptsuball
+      EXPORTING
+        ztddlistsub_in  = gt_ztddlistsub
+        action          = 'UPD'
+      IMPORTING
+        ztddlistsub_out = gt_ztddlistsub_sub.
+    " 子部门也可能会有子部门，这部分也得获取到  03.06.2024 16:22:37 by kkw
+
+*    LOOP AT gt_ztddlistsub ASSIGNING FIELD-SYMBOL(<gt_ztddlistsub>).
+*      CLEAR:rtype,rtmsg,gt_ztddlistsub_sub.
+*      CALL METHOD me->get_dept
+*        EXPORTING
+*          dept_id        = <gt_ztddlistsub>-dept_id
+**         language       = 'zh_CN'
+*        IMPORTING
+**         rtype          = rtype
+**         rtmsg          = rtmsg
+*          gt_ztddlistsub = gt_ztddlistsub_sub.
+    IF gt_ztddlistsub_sub IS NOT INITIAL.
+      APPEND LINES OF gt_ztddlistsub_sub TO gt_ztddlistsub_total.
+    ENDIF.
+*    ENDLOOP.
     IF init_all = 'X'.
       DELETE FROM ztddlistsub.
       COMMIT WORK AND WAIT.
