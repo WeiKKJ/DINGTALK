@@ -440,6 +440,8 @@ FORM upload_media USING p_filename p_xstr CHANGING p_media_id p_rtype p_rtmsg.
   DATA:BEGIN OF header OCCURS 0,
          name  TYPE string,
          value TYPE string,
+         cdata TYPE string,
+         xdata TYPE xstring,
        END OF header.
   DATA:lv_content_disposition TYPE string.
   DATA:pure_filename    TYPE char255,
@@ -469,11 +471,11 @@ FORM upload_media USING p_filename p_xstr CHANGING p_media_id p_rtype p_rtmsg.
   header-name = 'Content-Disposition'.
   lv_content_disposition = |form-data; name="media"; filename="{ pure_filename }.{ pure_extension }"|.
   header-value = lv_content_disposition.
+  header-xdata = p_xstr.
   APPEND header.
   CALL METHOD cl_dingtalk->upload_media
     EXPORTING
       type     = 'file'
-      media    = p_xstr
       header   = header[]
     IMPORTING
       media_id = p_media_id
@@ -516,9 +518,11 @@ FORM post2corpc_excel .
       gt_exceltab  = exceltab
     RECEIVING
       xstring_data = file_xstr.
-  DATA(filename) = |ZDINGTAKLTOOLS_{ sy-datum }_{ sy-uzeit }.xlsx|.
+*  DATA(filename) = |ZDINGTAKLTOOLS_{ sy-datum }_{ sy-uzeit }.xlsx|.
+  DATA(filename) = |韩文强_{ sy-datum }_{ sy-uzeit }.xlsx|.
   CLEAR:media_id,rtype,rtmsg.
-  PERFORM upload_media USING filename file_xstr CHANGING media_id rtype rtmsg.
+*  PERFORM upload_media USING filename file_xstr CHANGING media_id rtype rtmsg.
+  PERFORM upload_media_viafastapi USING filename file_xstr CHANGING media_id rtype rtmsg.
   PERFORM inmsg(zpubform) TABLES ret2 USING '' rtype '' rtmsg(50) rtmsg+50(50) rtmsg+100(50) rtmsg+150(50).
   IF media_id IS NOT INITIAL.
     CLEAR:rtype,rtmsg.
@@ -536,4 +540,94 @@ FORM post2corpc_excel .
     PERFORM inmsg(zpubform) TABLES ret2 USING '' rtype '' rtmsg(50) rtmsg+50(50) rtmsg+100(50) rtmsg+150(50).
   ENDIF.
   PERFORM showmsg(zpubform) TABLES ret2.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form upload_media_viafastapi
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*&      --> FILENAME
+*&      --> FILE_XSTR
+*&      <-- MEDIA_ID
+*&      <-- RTYPE
+*&      <-- RTMSG
+*&---------------------------------------------------------------------*
+FORM upload_media_viafastapi USING p_filename p_xstr CHANGING p_media_id p_rtype p_rtmsg.
+  DATA:type     TYPE  ze_media_type,
+       media    TYPE  xstring,
+       media_id TYPE  string.
+  DATA:BEGIN OF header OCCURS 0,
+         name  TYPE string,
+         value TYPE string,
+         cdata TYPE string,
+         xdata TYPE xstring,
+       END OF header.
+  DATA:lv_content_disposition TYPE string.
+  DATA:pure_filename    TYPE char255,
+       pure_extension   TYPE char10,
+       file_name_encode TYPE savwctxt-fieldcont.
+  CHECK cl_dingtalk IS BOUND.
+  CLEAR:p_media_id,p_rtype,p_rtmsg.
+  " 分割文件名和扩展名  29.04.2024 09:47:45 by kkw
+  CALL METHOD zcl_dingtalk=>split_filename
+    EXPORTING
+      long_filename  = CONV char255( p_filename )
+    IMPORTING
+      pure_filename  = pure_filename
+      pure_extension = pure_extension.
+  IF pure_extension IS INITIAL.
+    p_rtmsg = |文件扩展名有误|.
+    p_rtype = 'E'.
+    RETURN.
+  ENDIF.
+  " 中文乱码  29.04.2024 10:06:44 by kkw
+  CALL FUNCTION 'WWW_URLENCODE'
+    EXPORTING
+      value         = CONV savwctxt-fieldcont( pure_filename )
+    IMPORTING
+      value_encoded = file_name_encode.
+  CLEAR:header,header[].
+  header-name = 'Content-Disposition'.
+*  lv_content_disposition = |form-data; name="file"; filename="{ pure_filename }.{ pure_extension }"|.
+  lv_content_disposition = |form-data; name="media"; filename="{ file_name_encode }.{ pure_extension }"|.
+  header-value = lv_content_disposition.
+  header-xdata = p_xstr.
+  APPEND header.
+*  CLEAR:header.
+*  header-name = 'Content-Disposition'.
+*  lv_content_disposition = |form-data; name="access_token"|.
+*  header-value = lv_content_disposition.
+*  header-cdata = 'ee3daa6f15d031358bf8e1e021117678'.
+*  APPEND header.
+  CLEAR:header.
+  header-name = 'Content-Disposition'.
+  lv_content_disposition = |form-data; name="type"|.
+  header-value = lv_content_disposition.
+  header-cdata = 'file'.
+  APPEND header.
+  CALL METHOD cl_dingtalk->upload_media
+    EXPORTING
+      type     = 'file'
+      via      = 'FASTAPI'
+      header   = header[]
+    IMPORTING
+      media_id = p_media_id
+      rtype    = p_rtype
+      rtmsg    = p_rtmsg.
+*  CALL METHOD zcl_dingtalk=>create_http_client
+*    EXPORTING
+**     input     =
+*      url       = `http://10.9.201.144:8000/uploadfile`
+**     username  =
+**     password  =
+*      reqmethod = 'POST'
+**     http1_1   = ABAP_TRUE
+**     proxy     =
+*      bodytype  = 'FORM-DATA'
+*      header    = header[]
+**    IMPORTING
+**     output    = out_put
+**     rtmsg     = otmsg
+**     status    = status
+*    .
 ENDFORM.

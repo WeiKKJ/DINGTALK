@@ -27,7 +27,6 @@ public section.
   class-methods CREATE_HTTP_CLIENT
     importing
       value(INPUT) type STRING optional
-      value(MEDIA) type XSTRING optional
       value(URL) type STRING
       value(USERNAME) type STRING optional
       value(PASSWORD) type STRING optional
@@ -89,10 +88,10 @@ public section.
   methods UPLOAD_MEDIA
     importing
       value(TYPE) type ZE_MEDIA_TYPE
-      value(MEDIA) type XSTRING
       value(HEADER) type ANY TABLE
+      !VIA type STRING default `FASTAPI`
     exporting
-      !MEDIA_ID type STRING
+      value(MEDIA_ID) type STRING
       value(RTYPE) type BAPI_MTYPE
       value(RTMSG) type BAPI_MSG .
 protected section.
@@ -108,6 +107,7 @@ private section.
   constants UPLOAD_MEDIA_URL type STRING value `https://oapi.dingtalk.com/media/upload` ##NO_TEXT.
   constants MAXLENGTH type I value 20971520 ##NO_TEXT.
   data MY_LOGGER type ref to ZIF_LOGGER .
+  constants UPLOAD_MEDIA_VIAFASTAPI_URL type STRING value `http://10.9.203.28:18888/uploadmedia` ##NO_TEXT.
 
   methods GET_DEPTSUBALL
     importing
@@ -158,8 +158,11 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
 
 
   METHOD create_http_client.
-    DATA:result        TYPE string,
-         message       TYPE string,
+    DATA:message       TYPE string,
+         name          TYPE string,
+         value         TYPE string,
+         cdata         TYPE string,
+         xdata         TYPE xstring,
          proxy_host    TYPE string,
          proxy_service TYPE string,
          proxy_user    TYPE string,
@@ -176,9 +179,11 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
          pure_extension TYPE char10.
     FIELD-SYMBOLS:<wa>       TYPE any,
                   <fs_name>  TYPE any,
-                  <fs_value> TYPE any.
+                  <fs_value> TYPE any,
+                  <fs_cdata> TYPE any,
+                  <fs_xdata> TYPE any.
 
-    CLEAR:output,length,rtmsg,result,message,status,
+    CLEAR:output,length,rtmsg,name,value,status,
     pure_filename,pure_extension,
     lv_content_disposition,lv_content_type,
     proxy_service,proxy_host,proxy_user,proxy_passwd.
@@ -245,109 +250,125 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
       WHEN 'JSON'.
         http_object->request->set_header_field( name = 'Content-Type' value = 'application/json;charset=utf-8' ).
       WHEN 'FORM-DATA'.
+*        http_object->request->set_content_type( content_type = 'application/ x-www-form-urlencoded; charset=utf-8' ).
 *        http_object->request->set_header_field( name = 'charset' value = 'UTF-8' ).
 *        http_object->request->set_header_field( name = 'accept-language' value = 'zh-CN' ).
         http_object->request->set_header_field( name = 'Content-Type' value = 'multipart/form-data' ).
-        http_entity = http_object->request->if_http_entity~add_multipart( ).
     ENDCASE.
 
 *设置头部数据
     LOOP AT header ASSIGNING <wa>.
-      CLEAR:result,message.
-      ASSIGN COMPONENT 1 OF STRUCTURE <wa> TO <fs_name>.
+      CLEAR:name,value,cdata,xdata.
+      ASSIGN COMPONENT 'NAME' OF STRUCTURE <wa> TO <fs_name>.
       IF sy-subrc NE 0.
-        EXIT.
+        RETURN.
       ENDIF.
-      ASSIGN COMPONENT 2 OF STRUCTURE <wa> TO <fs_value>.
+      ASSIGN COMPONENT 'VALUE' OF STRUCTURE <wa> TO <fs_value>.
       IF sy-subrc NE 0.
-        EXIT.
+        RETURN.
       ENDIF.
-      CHECK <fs_name> IS NOT INITIAL
-      AND   <fs_value> IS NOT INITIAL.
-      result = <fs_name>.
-      message = <fs_value>.
+      ASSIGN COMPONENT 'CDATA' OF STRUCTURE <wa> TO <fs_cdata>.
+      IF sy-subrc NE 0.
+        RETURN.
+      ENDIF.
+      ASSIGN COMPONENT 'XDATA' OF STRUCTURE <wa> TO <fs_xdata>.
+      IF sy-subrc NE 0.
+        RETURN.
+      ENDIF.
+      CHECK <fs_name> IS NOT INITIAL AND <fs_value> IS NOT INITIAL.
+      name = <fs_name>.
+      value = <fs_value>.
+      cdata = <fs_cdata>.
+      xdata = <fs_xdata>.
       IF bodytype = 'JSON'.
-        http_object->request->set_header_field( name = result value = message ).
+        http_object->request->set_header_field( name = name value = value ).
 *设置下 content_type
       ELSEIF bodytype = 'FORM-DATA'.
-        SPLIT condense( replace( val  = message
-                         pcre = `\s`
-                         with = ``
-                         occ  = 0 ) ) AT `;` INTO TABLE DATA(lt_split).
+        FREE http_entity.
+        http_entity = http_object->request->if_http_entity~add_multipart( ).
+        CASE name.
+          WHEN 'Content-Disposition'.
+            IF cdata IS NOT INITIAL." 文本类型  05.06.2024 19:51:02 by kkw
+              http_entity->set_header_field( name = name value = value ).
+              http_entity->append_cdata( data = cdata ).
+              CONTINUE.
+            ENDIF.
+            " 文件类型  05.06.2024 19:51:16 by kkw
+            SPLIT condense( replace( val  = value
+                             pcre = `\s`
+                             with = ``
+                             occ  = 0 ) ) AT `;` INTO TABLE DATA(lt_split).
 
-        LOOP AT lt_split ASSIGNING FIELD-SYMBOL(<lt_split>).
-          IF <lt_split>(8) = 'filename' AND <lt_split>(9) NE 'filename*'.
-            long_filename = replace( val  = <lt_split>+9
-                                     pcre = `\"`
-                                     with = ``
-                                     occ  = 0 ).
-            CALL METHOD zcl_dingtalk=>split_filename
-              EXPORTING
-                long_filename  = long_filename
-              IMPORTING
-                pure_filename  = pure_filename
-                pure_extension = pure_extension.
+            LOOP AT lt_split ASSIGNING FIELD-SYMBOL(<lt_split>).
+              IF <lt_split>(8) = 'filename' AND <lt_split>(9) NE 'filename*'.
+                long_filename = replace( val  = <lt_split>+9
+                                         pcre = `\"`
+                                         with = ``
+                                         occ  = 0 ).
+                CALL METHOD zcl_dingtalk=>split_filename
+                  EXPORTING
+                    long_filename  = long_filename
+                  IMPORTING
+                    pure_filename  = pure_filename
+                    pure_extension = pure_extension.
 
-            CASE pure_extension.
-              WHEN 'rar'.
-                lv_content_type = 'application/x-rar-compressed'.
-              WHEN 'pdf'.
-                lv_content_type = 'application/pdf'.
-              WHEN 'zip'.
-                lv_content_type = 'application/zip'.
-              WHEN 'pptx'.
-                lv_content_type = 'application/vnd.openxmlformats-officedocument.presentationml.presentation'.
-              WHEN 'ppt'.
-                lv_content_type = 'application/vnd.ms-powerpoint'.
-              WHEN 'xlsx'.
-                lv_content_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'.
-              WHEN 'xls'.
-                lv_content_type = 'application/vnd.ms-excel'.
-              WHEN 'docx'.
-                lv_content_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'.
-              WHEN 'doc'.
-                lv_content_type = 'application/msword'.
-              WHEN 'mp4'.
-                lv_content_type = 'video/mp4'.
-              WHEN 'wav'.
-                lv_content_type = 'audio/wav'.
-              WHEN 'mp3'.
-                lv_content_type = 'audio/mpeg'.
-              WHEN 'amr'.
-                lv_content_type = 'audio/amr'.
-              WHEN 'bmp'.
-                lv_content_type = 'image/bmp'.
-              WHEN 'gif'.
-                lv_content_type = 'image/gif'.
-              WHEN 'jpg'.
-                lv_content_type = 'image/jpeg'.
-              WHEN 'jpg'.
-                lv_content_type = 'image/jpeg'.
-              WHEN 'png'.
-                lv_content_type = 'image/png'.
-              WHEN 'txt'.
-                lv_content_type = 'text/plain'.
-            ENDCASE.
-            http_entity->set_content_type( lv_content_type ).
-            http_entity->set_header_field( name = result value = message ).
-            length = xstrlen( media ).
-          ENDIF.
-        ENDLOOP.
+                CASE pure_extension.
+                  WHEN 'rar'.
+                    lv_content_type = 'application/x-rar-compressed'.
+                  WHEN 'pdf'.
+                    lv_content_type = 'application/pdf'.
+                  WHEN 'zip'.
+                    lv_content_type = 'application/zip'.
+                  WHEN 'pptx'.
+                    lv_content_type = 'application/vnd.openxmlformats-officedocument.presentationml.presentation'.
+                  WHEN 'ppt'.
+                    lv_content_type = 'application/vnd.ms-powerpoint'.
+                  WHEN 'xlsx'.
+                    lv_content_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'.
+                  WHEN 'xls'.
+                    lv_content_type = 'application/vnd.ms-excel'.
+                  WHEN 'docx'.
+                    lv_content_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'.
+                  WHEN 'doc'.
+                    lv_content_type = 'application/msword'.
+                  WHEN 'mp4'.
+                    lv_content_type = 'video/mp4'.
+                  WHEN 'wav'.
+                    lv_content_type = 'audio/wav'.
+                  WHEN 'mp3'.
+                    lv_content_type = 'audio/mpeg'.
+                  WHEN 'amr'.
+                    lv_content_type = 'audio/amr'.
+                  WHEN 'bmp'.
+                    lv_content_type = 'image/bmp'.
+                  WHEN 'gif'.
+                    lv_content_type = 'image/gif'.
+                  WHEN 'jpg'.
+                    lv_content_type = 'image/jpeg'.
+                  WHEN 'png'.
+                    lv_content_type = 'image/png'.
+                  WHEN 'txt'.
+                    lv_content_type = 'text/plain'.
+                ENDCASE.
+                http_entity->set_content_type( lv_content_type ).
+                http_entity->set_header_field( name = name value = value ).
+                length = xstrlen( xdata ).
+                http_entity->set_data( data = xdata offset = 0 length = length ).
+              ENDIF.
+            ENDLOOP.
+          WHEN OTHERS.
+            http_object->request->set_header_field( name = name value = value ).
+        ENDCASE.
       ENDIF.
+      UNASSIGN:<fs_name>,<fs_value>,<fs_cdata>,<fs_xdata>.
     ENDLOOP.
-    CLEAR:result,message.
+    CLEAR:name,value,cdata,xdata.
 
 *输入发送数据
     IF input IS NOT INITIAL.
       CALL METHOD http_object->request->set_cdata
         EXPORTING
           data   = input
-          offset = 0
-          length = length.
-    ELSEIF media IS NOT INITIAL.
-      CALL METHOD http_entity->set_data
-        EXPORTING
-          data   = media
           offset = 0
           length = length.
     ENDIF.
@@ -390,21 +411,21 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
     CALL METHOD http_object->response->get_header_fields
       CHANGING
         fields = fields.
-    result = http_object->response->get_cdata( ).
+    name = http_object->response->get_cdata( ).
     IF sy-subrc NE 0.
       http_object->get_last_error( IMPORTING message = message ).
       rtmsg = message.
       http_object->close( ).
       RETURN.
     ENDIF.
-    message = http_object->response->get_data( ).
+    value = http_object->response->get_data( ).
 * 将返回参数的回车转换，否则回车会在SAP变成'#'
-*  REPLACE ALL OCCURRENCES OF REGEX '\n' IN RESULT WITH ''.
+*  REPLACE ALL OCCURRENCES OF REGEX '\n' IN name WITH ''.
 *关闭HTTP连接
 
     http_object->close( ).
 
-    output = result.
+    output = name.
 
   ENDMETHOD.
 
@@ -1422,18 +1443,39 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
              type       TYPE string,
            END OF t_JSON1.
     DATA:wa_out TYPE t_JSON1.
-
+    TYPES: BEGIN OF t_RESPONSE_TEXT2,
+             errcode    TYPE i,
+             errmsg     TYPE string,
+             media_id   TYPE string,
+             created_at TYPE p LENGTH 16 DECIMALS 0,
+             type       TYPE string,
+           END OF t_RESPONSE_TEXT2.
+    TYPES: BEGIN OF t_JSON1_fastapi,
+             status_code   TYPE i,
+             response_text TYPE t_RESPONSE_TEXT2,
+           END OF t_JSON1_fastapi.
+    DATA:wa_out_fastapi TYPE t_JSON1_fastapi.
     DATA:url     TYPE string,
          out_put TYPE string,
          otmsg   TYPE string,
          status  TYPE i.
     DATA:access_token TYPE ztddconfig-access_token.
-    IF xstrlen( media ) GT maxlength.
-      rtype = 'E'.
-      rtmsg = |钉钉要求媒体文件最大不能超过{ maxlength / 1048576 }MB，当前大小为{ xstrlen( media ) / 1048576 }MB|.
-      me->my_logger->e( obj_to_log = rtmsg ) .
-      RETURN.
-    ENDIF.
+    LOOP AT header ASSIGNING FIELD-SYMBOL(<header>).
+      ASSIGN COMPONENT 'XDATA' OF STRUCTURE <header> TO FIELD-SYMBOL(<xdata>).
+      IF <xdata> IS NOT ASSIGNED.
+        rtype = 'E'.
+        rtmsg = |header内表缺失'XDATA'字段|.
+        me->my_logger->e( obj_to_log = rtmsg ) .
+        RETURN.
+      ENDIF.
+      IF xstrlen( <xdata> ) GT maxlength.
+        rtype = 'E'.
+        rtmsg = |钉钉要求媒体文件最大不能超过{ maxlength / 1048576 }MB，当前大小为{ xstrlen( <xdata> ) / 1048576 }MB|.
+        me->my_logger->e( obj_to_log = rtmsg ) .
+        RETURN.
+      ENDIF.
+    ENDLOOP.
+
     CLEAR:rtype,rtmsg.
 *    获取token  26.04.2024 11:11:45 by kkw
     CALL METHOD me->gettoken
@@ -1445,11 +1487,28 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
     IF rtype NE 'S'.
       RETURN.
     ENDIF.
-    url = |{ upload_media_url }?access_token={ access_token }&type={ type }|.
+    CASE via.
+      WHEN 'INS'.
+        url = |{ upload_media_url }?access_token={ access_token }&type={ type }|.
+      WHEN 'FASTAPI'.
+        url = |{ upload_media_viafastapi_url }|.
+        INSERT INITIAL LINE INTO TABLE header ASSIGNING <header>.
+        ASSIGN COMPONENT 'NAME' OF STRUCTURE <header> TO FIELD-SYMBOL(<name>).
+        IF sy-subrc EQ 0.
+          <name> = 'Content-Disposition'.
+        ENDIF.
+        ASSIGN COMPONENT 'VALUE' OF STRUCTURE <header> TO FIELD-SYMBOL(<value>).
+        IF sy-subrc EQ 0.
+          <value> = |form-data; name="access_token"|.
+        ENDIF.
+        ASSIGN COMPONENT 'CDATA' OF STRUCTURE <header> TO FIELD-SYMBOL(<cdata>).
+        IF sy-subrc EQ 0.
+          <cdata> = access_token.
+        ENDIF.
+    ENDCASE.
     CALL METHOD zcl_dingtalk=>create_http_client
       EXPORTING
 *       input     =
-        media     = media
         url       = url
 *       username  =
 *       password  =
@@ -1462,23 +1521,43 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
         output    = out_put
         rtmsg     = otmsg
         status    = status.
-
-    IF status EQ 200.
-      /ui2/cl_json=>deserialize( EXPORTING json = out_put pretty_name = /ui2/cl_json=>pretty_mode-low_case CHANGING data = wa_out ).
-      rtmsg = |调用appname:{ appname }上传媒体文件返回信息:{ wa_out-errmsg },errcode:{ wa_out-errcode },media_id:{ wa_out-media_id },状态码:{ status }|.
-      IF wa_out-errcode EQ 0.
-        rtype = 'S'.
-        media_id = wa_out-media_id.
-        me->my_logger->s( obj_to_log = rtmsg ) .
-      ELSE.
-        rtype = 'E'.
-        me->my_logger->e( obj_to_log = rtmsg ) .
-      ENDIF.
-    ELSE.
-      rtype = 'E'.
-      rtmsg = |调用appname:{ appname }上传媒体文件发生了问题:{ otmsg },状态码:{ status }|.
-      me->my_logger->e( obj_to_log = rtmsg ) .
-    ENDIF.
+    CASE via.
+      WHEN 'INS'.
+        IF status EQ 200.
+          /ui2/cl_json=>deserialize( EXPORTING json = out_put pretty_name = /ui2/cl_json=>pretty_mode-low_case CHANGING data = wa_out ).
+          rtmsg = |调用appname:{ appname }上传媒体文件返回信息:{ wa_out-errmsg },errcode:{ wa_out-errcode },media_id:{ wa_out-media_id },状态码:{ status }|.
+          IF wa_out-errcode EQ 0.
+            rtype = 'S'.
+            media_id = wa_out-media_id.
+            me->my_logger->s( obj_to_log = rtmsg ) .
+          ELSE.
+            rtype = 'E'.
+            me->my_logger->e( obj_to_log = rtmsg ) .
+          ENDIF.
+        ELSE.
+          rtype = 'E'.
+          rtmsg = |调用appname:{ appname }上传媒体文件发生了问题:{ otmsg },状态码:{ status }|.
+          me->my_logger->e( obj_to_log = rtmsg ) .
+        ENDIF.
+      WHEN 'FASTAPI'.
+        IF status EQ 200.
+          /ui2/cl_json=>deserialize( EXPORTING json = out_put pretty_name = /ui2/cl_json=>pretty_mode-low_case CHANGING data = wa_out_fastapi ).
+          rtmsg = |调用appname:{ appname }上传媒体文件(FastAPI)返回信息:{ wa_out_fastapi-response_text-errmsg },errcode:{ wa_out_fastapi-response_text-errcode },|
+                   && |media_id:{ wa_out_fastapi-response_text-media_id },状态码:{ wa_out_fastapi-status_code }|.
+          IF wa_out_fastapi-response_text-errcode EQ 0.
+            rtype = 'S'.
+            media_id = wa_out_fastapi-response_text-media_id.
+            me->my_logger->s( obj_to_log = rtmsg ) .
+          ELSE.
+            rtype = 'E'.
+            me->my_logger->e( obj_to_log = rtmsg ) .
+          ENDIF.
+        ELSE.
+          rtype = 'E'.
+          rtmsg = |调用appname:{ appname }上传媒体文件(FastAPI)发生了问题:{ otmsg },状态码:{ status }|.
+          me->my_logger->e( obj_to_log = rtmsg ) .
+        ENDIF.
+    ENDCASE.
   ENDMETHOD.
 
 
