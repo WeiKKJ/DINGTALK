@@ -1,0 +1,1 @@
+docker run -d --env-file .env -e TZ=Asia/Shanghai -e FASTAPI_PORT=8000 -e UPLOAD_MEDIA_URL=https://oapi.dingtalk.com/media/upload -p 8002:8000 --name dingtalk-upload-media dingtalk-upload-media
