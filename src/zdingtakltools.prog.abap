@@ -519,7 +519,7 @@ FORM post2corpc_excel .
     RECEIVING
       xstring_data = file_xstr.
 *  DATA(filename) = |ZDINGTAKLTOOLS_{ sy-datum }_{ sy-uzeit }.xlsx|.
-  DATA(filename) = |韩文强_{ sy-datum }_{ sy-uzeit }.xlsx|.
+  DATA(filename) = |钉钉推送文件测试_{ sy-datum+2(6) }_{ sy-uzeit }.xlsx|.
   CLEAR:media_id,rtype,rtmsg.
 *  PERFORM upload_media USING filename file_xstr CHANGING media_id rtype rtmsg.
   PERFORM upload_media_viafastapi USING filename file_xstr CHANGING media_id rtype rtmsg.

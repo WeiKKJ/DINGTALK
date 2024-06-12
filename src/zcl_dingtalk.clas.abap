@@ -1491,7 +1491,19 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
       WHEN 'INS'.
         url = |{ upload_media_url }?access_token={ access_token }&type={ type }|.
       WHEN 'FASTAPI'.
-        url = |{ upload_media_viafastapi_url }|.
+*        url = |{ upload_media_viafastapi_url }|.
+        SELECT SINGLE jz
+          INTO @DATA(uurl)
+          FROM ztsap_pubdata
+          WHERE zj = 'UPLOAD_MEDIA_VIAFASTAPI_URL'
+          AND   sxbs NE 'X'.
+        url = uurl.
+        IF url IS INITIAL.
+          rtype = 'E'.
+          rtmsg = |调用appname:{ appname }上传媒体文件发生了问题:FastAPI转发方式需要配置zmm000-SAP程序默认值配置-主键'UPLOAD_MEDIA_VIAFASTAPI_URL'的键值|.
+          me->my_logger->e( obj_to_log = rtmsg ) .
+          RETURN.
+        ENDIF.
         INSERT INITIAL LINE INTO TABLE header ASSIGNING <header>.
         ASSIGN COMPONENT 'NAME' OF STRUCTURE <header> TO FIELD-SYMBOL(<name>).
         IF sy-subrc EQ 0.
