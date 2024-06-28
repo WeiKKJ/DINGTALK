@@ -18,7 +18,8 @@ SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE btxt1.
              p3 RADIOBUTTON GROUP grd1,
              p4 RADIOBUTTON GROUP grd1,
              p5 RADIOBUTTON GROUP grd1,
-             p6 RADIOBUTTON GROUP grd1.
+             p6 RADIOBUTTON GROUP grd1,
+             p7 RADIOBUTTON GROUP grd1.
 
 SELECTION-SCREEN END OF BLOCK b1.
 
@@ -35,36 +36,46 @@ SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME TITLE btxt2.
 
 SELECTION-SCREEN END OF BLOCK b2.
 
+SELECTION-SCREEN BEGIN OF BLOCK b3 WITH FRAME TITLE btxt3.
+  PARAMETERS:p71 RADIOBUTTON GROUP prd3 USER-COMMAND ss3 DEFAULT 'X' MODIF ID p7,
+             p72 RADIOBUTTON GROUP prd3 MODIF ID p7.
+SELECTION-SCREEN END OF BLOCK b3.
+
 AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_file.
   PERFORM frm_f4_file.
 
 AT SELECTION-SCREEN OUTPUT.
   btxt1 = '功能选择'(t01).
   btxt2 = '数据筛选'(t02).
+  btxt3 = '机器人相关'(t03).
 
   LOOP AT SCREEN.
     IF p1 = 'X'.
-      IF screen-group1 = 'M2' OR screen-group1 = 'M3' OR screen-group1 = 'M4' OR screen-group1 = 'M6' OR screen-group1 = 'M7'.
+      IF ( screen-group1(1) = 'M' AND NOT ( screen-group1 = 'M1' OR screen-group1 = 'M5' ) ) OR screen-group1(1) = 'P'.
         screen-active = 0.
       ENDIF.
     ELSEIF p2 = 'X'.
-      IF screen-group1 = 'M2' OR screen-group1 = 'M3' OR screen-group1 = 'M4' OR screen-group1 = 'M6' OR screen-group1 = 'M7'.
+      IF ( screen-group1(1) = 'M' AND NOT ( screen-group1 = 'M1' OR screen-group1 = 'M5' ) ) OR screen-group1(1) = 'P'.
         screen-active = 0.
       ENDIF.
     ELSEIF p3 = 'X'.
-      IF screen-group1 = 'M1' OR screen-group1 = 'M5' OR screen-group1 = 'M6'.
+      IF screen-group1 = 'M1' OR screen-group1 = 'M5' OR screen-group1 = 'M6' OR screen-group1(1) = 'P'.
         screen-active = 0.
       ENDIF.
     ELSEIF p4 = 'X'.
-      IF screen-group1 = 'M1' OR screen-group1 = 'M2' OR screen-group1 = 'M5' OR screen-group1 = 'M6' OR screen-group1 = 'M7'.
+      IF ( screen-group1(1) = 'M' AND NOT ( screen-group1 = 'M3' OR screen-group1 = 'M4' ) ) OR screen-group1(1) = 'P'.
         screen-active = 0.
       ENDIF.
     ELSEIF p5 = 'X'.
-      IF screen-group1 = 'M1' OR screen-group1 = 'M2' OR screen-group1 = 'M3' OR screen-group1 = 'M4' OR screen-group1 = 'M5'  OR screen-group1 = 'M7'.
+      IF ( screen-group1(1) = 'M' AND NOT ( screen-group1 = 'M6' ) ) OR screen-group1(1) = 'P'.
         screen-active = 0.
       ENDIF.
     ELSEIF p6 = 'X'.
-      IF screen-group1(1) = 'M' AND screen-group1 NE 'M2'.
+      IF ( screen-group1(1) = 'M' AND NOT ( screen-group1 = 'M2' ) ) OR screen-group1(1) = 'P'.
+        screen-active = 0.
+      ENDIF.
+    ELSEIF p7 = 'X'.
+      IF screen-group1(1) = 'M'.
         screen-active = 0.
       ENDIF.
     ENDIF.
@@ -114,11 +125,17 @@ FORM getdata.
   ELSEIF p5 = 'X'.
     CLEAR:p_medid,rtype,rtmsg.
     PERFORM read_upload_file.
-    PERFORM upload_media USING p_file file_xstr CHANGING p_medid rtype rtmsg.
+    PERFORM upload_media_viafastapi USING p_file file_xstr CHANGING p_medid rtype rtmsg.
     PERFORM inmsg(zpubform) TABLES ret2 USING '' rtype '' rtmsg(50) rtmsg+50(50) rtmsg+100(50) rtmsg+150(50).
     PERFORM showmsg(zpubform) TABLES ret2.
   ELSEIF p6 = 'X'.
     PERFORM post2corpc_excel.
+  ELSEIF p7 = 'X'.
+    IF p71 = 'X'.
+      PERFORM robot_groupmessages_send.
+    ELSEIF p72 = 'X'.
+      PERFORM robot_interactivecards_send.
+    ENDIF.
   ELSE.
     EXIT.
   ENDIF.
@@ -475,6 +492,7 @@ FORM upload_media USING p_filename p_xstr CHANGING p_media_id p_rtype p_rtmsg.
   APPEND header.
   CALL METHOD cl_dingtalk->upload_media
     EXPORTING
+      via      = 'INS'
       type     = 'file'
       header   = header[]
     IMPORTING
@@ -593,12 +611,7 @@ FORM upload_media_viafastapi USING p_filename p_xstr CHANGING p_media_id p_rtype
   header-value = lv_content_disposition.
   header-xdata = p_xstr.
   APPEND header.
-*  CLEAR:header.
-*  header-name = 'Content-Disposition'.
-*  lv_content_disposition = |form-data; name="access_token"|.
-*  header-value = lv_content_disposition.
-*  header-cdata = 'ee3daa6f15d031358bf8e1e021117678'.
-*  APPEND header.
+
   CLEAR:header.
   header-name = 'Content-Disposition'.
   lv_content_disposition = |form-data; name="type"|.
@@ -614,20 +627,96 @@ FORM upload_media_viafastapi USING p_filename p_xstr CHANGING p_media_id p_rtype
       media_id = p_media_id
       rtype    = p_rtype
       rtmsg    = p_rtmsg.
-*  CALL METHOD zcl_dingtalk=>create_http_client
-*    EXPORTING
-**     input     =
-*      url       = `http://10.9.201.144:8000/uploadfile`
-**     username  =
-**     password  =
-*      reqmethod = 'POST'
-**     http1_1   = ABAP_TRUE
-**     proxy     =
-*      bodytype  = 'FORM-DATA'
-*      header    = header[]
-**    IMPORTING
-**     output    = out_put
-**     rtmsg     = otmsg
-**     status    = status
-*    .
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form robot_groupmessages_send
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM robot_groupmessages_send .
+  CLEAR:rtype,rtmsg,ret2.
+  CHECK cl_dingtalk IS BOUND.
+*  DATA(str) = `{"content":"钉钉，让进步发生"}`.
+  DATA(str) = '{"title": "xxxx","text": "'
+  && `#### 呆滞物料提醒，-测试消息1-4 \n 物料 | 自编号 | 数量 | 呆滞天数 \n ---- | --- | ---- | ---- \n E0201205193`
+  && ` | WBSL221111-09 | 0.290 | 185 \n E0201205192 | WBSL211114-18 | 0.524 | 185 \n E0201205173 | WBSL221029-50 | 0.480 | 185 `
+  && `\n E0201205173 | WBSL221029-53 | 4.300 | 185 \n > ###### 16:39:20 发送自客户端252"}`.
+
+  CALL METHOD cl_dingtalk->robot_groupmessages_send
+    EXPORTING
+      msgparam           = str
+*     msgkey             = `sampleText`
+      msgkey             = `sampleMarkdown`
+      openconversationid = `cidXYPRNjWm2X5bxoE65dGyig==`
+      robotcode          = `dinge9jdnvholvqayvgc`
+    IMPORTING
+      rtype              = rtype
+      rtmsg              = rtmsg.
+  MESSAGE s000(oo) WITH rtmsg DISPLAY LIKE rtype.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form ROBOT_INTERACTIVECARDS_SEND
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM robot_interactivecards_send .
+  DATA:carddata LIKE zcl_dingtalk=>lt_kv.
+  CLEAR:rtype,rtmsg,ret2.
+  CHECK cl_dingtalk IS BOUND.
+  DATA(cardtemplateid) = '6f2cb6bb-f489-495a-a875-7158e6d63fb5.schema'.
+  DATA(outtrackid) = |{ cardtemplateid }.{ sy-datum+2(6) }{ sy-uzeit }|.
+  INSERT INITIAL LINE INTO TABLE carddata ASSIGNING FIELD-SYMBOL(<carddata>).
+  <carddata>-key = 'title'.
+  <carddata>-value = 'SAP推送的测试卡片消息'.
+  INSERT INITIAL LINE INTO TABLE carddata ASSIGNING <carddata>.
+  <carddata>-key = 'lable'.
+  <carddata>-value = 'SAP@KKW'.
+  INSERT INITIAL LINE INTO TABLE carddata ASSIGNING <carddata>.
+  <carddata>-key = 'markdown'.
+  <carddata>-value = |#### 这是SAP发出的提醒,{ outtrackid }|.
+  INSERT INITIAL LINE INTO TABLE carddata ASSIGNING <carddata>.
+  <carddata>-key = 'hover'.
+  <carddata>-value = 'SAP测试互动卡片'.
+  INSERT INITIAL LINE INTO TABLE carddata ASSIGNING <carddata>.
+  <carddata>-key = 'but01_text'.
+  <carddata>-value = '尝试重新运行'.
+  INSERT INITIAL LINE INTO TABLE carddata ASSIGNING <carddata>.
+  <carddata>-key = 'but02_text'.
+  <carddata>-value = '已重新执行完毕'.
+  INSERT INITIAL LINE INTO TABLE carddata ASSIGNING <carddata>.
+  <carddata>-key = 'but03_text'.
+  <carddata>-value = '已取消执行'.
+  INSERT INITIAL LINE INTO TABLE carddata ASSIGNING <carddata>.
+  <carddata>-key = 'but_status'.
+  <carddata>-value = '1'.
+  INSERT INITIAL LINE INTO TABLE carddata ASSIGNING <carddata>.
+  <carddata>-key = 'callback_key'.
+  <carddata>-value = |{ outtrackid }|.
+  INSERT INITIAL LINE INTO TABLE carddata ASSIGNING <carddata>.
+  <carddata>-key = 'rtype'.
+  <carddata>-value = ''.
+  INSERT INITIAL LINE INTO TABLE carddata ASSIGNING <carddata>.
+  <carddata>-key = 'rtmsg'.
+  <carddata>-value = '没有回调成功'.
+  CALL METHOD cl_dingtalk->robot_interactivecards_send
+    EXPORTING
+      cardtemplateid     = CONV string( cardtemplateid )
+      openconversationid = 'cidXYPRNjWm2X5bxoE65dGyig=='
+      outtrackid         = outtrackid
+      robotcode          = 'dinge9jdnvholvqayvgc'
+*     conversationtype   = 1
+      callbackroutekey   = 'OA4FgkdsWiz9wgjNbrsQLtga3sgqFXtl'
+      carddata           = carddata
+*     privatedata        =
+*     useridtype         = 1
+    IMPORTING
+      rtype              = rtype
+      rtmsg              = rtmsg.
+  MESSAGE s000(oo) WITH rtmsg DISPLAY LIKE rtype.
 ENDFORM.

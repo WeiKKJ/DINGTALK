@@ -1,99 +1,129 @@
-class ZCL_DINGTALK definition
-  public
-  final
-  create public .
+CLASS zcl_dingtalk DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC .
 
-public section.
+  PUBLIC SECTION.
 
-  types:
-    BEGIN OF ty_excel,
+    TYPES:
+      BEGIN OF ty_excel,
         excel_tabdref   TYPE REF TO data,
         excel_fieldcat  TYPE zexcel_t_fieldcatalog,
         excel_sheetname TYPE zexcel_sheet_title,
       END OF ty_excel .
+    TYPES:
+      BEGIN OF ty_kv,
+        key   TYPE string,
+        value TYPE string,
+      END OF ty_kv .
 
-  class-data:
-    lt_ztddlistsub TYPE TABLE OF ztddlistsub .
-  class-data:
-    lt_userid_list TYPE TABLE OF ztdduser-userid .
-  class-data:
-    lt_ztdduser  TYPE TABLE OF ztdduser .
-  class-data:
-    exceltab  TYPE TABLE OF ty_excel .
+    CLASS-DATA:
+      lt_ztddlistsub TYPE TABLE OF ztddlistsub .
+    CLASS-DATA:
+      lt_userid_list TYPE TABLE OF ztdduser-userid .
+    CLASS-DATA:
+      lt_ztdduser  TYPE TABLE OF ztdduser .
+    CLASS-DATA:
+      exceltab  TYPE TABLE OF ty_excel .
+    CLASS-DATA:
+     lt_kv TYPE TABLE OF ty_kv .
 
-  methods CONSTRUCTOR
-    importing
-      value(APPID) type ZE_APPID .
-  class-methods CREATE_HTTP_CLIENT
-    importing
-      value(INPUT) type STRING optional
-      value(URL) type STRING
-      value(USERNAME) type STRING optional
-      value(PASSWORD) type STRING optional
-      value(REQMETHOD) type CHAR4
-      value(HTTP1_1) type ABAP_BOOL default ABAP_TRUE
-      value(PROXY) type STRING optional
-      value(BODYTYPE) type STRING default 'JSON'
-      value(HEADER) type STANDARD TABLE optional
-    exporting
-      value(OUTPUT) type STRING
-      value(RTMSG) type STRING
-      value(STATUS) type I .
-  class-methods SPLIT_FILENAME
-    importing
-      value(LONG_FILENAME) type CHAR255
-    exporting
-      value(PURE_FILENAME) type CHAR255
-      value(PURE_EXTENSION) type CHAR10 .
-  class-methods CREATE_EXCEL
-    importing
-      value(GT_EXCELTAB) like EXCELTAB
-    returning
-      value(XSTRING_DATA) type XSTRING .
-  methods POST2DDROBOT
-    importing
-      value(MSGTYPE) type ZE_MSGTYPE default 'text'
-      value(TITLE) type STRING optional
-      value(TEXT) type STRING optional
-    exporting
-      value(RTYPE) type BAPI_MTYPE
-      value(RTMSG) type BAPI_MSG .
-  methods POST2CORPCONVERSATION
-    importing
-      value(MSGTYPE) type ZE_MSGTYPE default 'text'
-      value(USERID) type STRING
-      value(TITLE) type STRING optional
-      value(TEXT) type STRING optional
-      value(MEDIA_ID) type ZE_MEDIA_ID optional
-      value(DURATION) type I optional
-    exporting
-      value(RTYPE) type BAPI_MTYPE
-      value(RTMSG) type BAPI_MSG .
-  methods INIT_DEPT
-    importing
-      value(DEPT_ID) type ZE_DEPT_ID default 1
-      value(LANGUAGE) type CHAR5 default 'zh_CN'
-      value(INIT_ALL) type ABAP_BOOL default ABAP_FALSE
-    exporting
-      value(RTYPE) type BAPI_MTYPE
-      value(RTMSG) type BAPI_MSG
-      value(GT_ZTDDLISTSUB_TOTAL) like LT_ZTDDLISTSUB .
-  methods INIT_USER
-    importing
-      value(DEPT_ID) type ZE_DEPT_ID
-      value(INIT_ALL) type ABAP_BOOL default ABAP_FALSE
-    exporting
-      value(RTYPE) type BAPI_MTYPE
-      value(RTMSG) type BAPI_MSG .
-  methods UPLOAD_MEDIA
-    importing
-      value(TYPE) type ZE_MEDIA_TYPE
-      value(HEADER) type ANY TABLE
-      !VIA type STRING default `FASTAPI`
-    exporting
-      value(MEDIA_ID) type STRING
-      value(RTYPE) type BAPI_MTYPE
-      value(RTMSG) type BAPI_MSG .
+    METHODS constructor
+      IMPORTING
+        VALUE(appid) TYPE ze_appid .
+    CLASS-METHODS create_http_client
+      IMPORTING
+        VALUE(input)     TYPE string OPTIONAL
+        VALUE(url)       TYPE string
+        VALUE(username)  TYPE string OPTIONAL
+        VALUE(password)  TYPE string OPTIONAL
+        VALUE(reqmethod) TYPE char4
+        VALUE(http1_1)   TYPE abap_bool DEFAULT abap_true
+        VALUE(proxy)     TYPE string OPTIONAL
+        VALUE(bodytype)  TYPE string DEFAULT 'JSON'
+        VALUE(header)    TYPE STANDARD TABLE OPTIONAL
+      EXPORTING
+        VALUE(output)    TYPE string
+        VALUE(rtmsg)     TYPE string
+        VALUE(status)    TYPE i .
+    CLASS-METHODS split_filename
+      IMPORTING
+        VALUE(long_filename)  TYPE char255
+      EXPORTING
+        VALUE(pure_filename)  TYPE char255
+        VALUE(pure_extension) TYPE char10 .
+    CLASS-METHODS create_excel
+      IMPORTING
+        VALUE(gt_exceltab)  LIKE exceltab
+      RETURNING
+        VALUE(xstring_data) TYPE xstring .
+    METHODS post2ddrobot
+      IMPORTING
+        VALUE(msgtype) TYPE ze_msgtype DEFAULT 'text'
+        VALUE(title)   TYPE string OPTIONAL
+        VALUE(text)    TYPE string OPTIONAL
+      EXPORTING
+        VALUE(rtype)   TYPE bapi_mtype
+        VALUE(rtmsg)   TYPE bapi_msg .
+    METHODS post2corpconversation
+      IMPORTING
+        VALUE(msgtype)  TYPE ze_msgtype DEFAULT 'text'
+        VALUE(userid)   TYPE string
+        VALUE(title)    TYPE string OPTIONAL
+        VALUE(text)     TYPE string OPTIONAL
+        VALUE(media_id) TYPE ze_media_id OPTIONAL
+        VALUE(duration) TYPE i OPTIONAL
+      EXPORTING
+        VALUE(rtype)    TYPE bapi_mtype
+        VALUE(rtmsg)    TYPE bapi_msg .
+    METHODS init_dept
+      IMPORTING
+        VALUE(dept_id)              TYPE ze_dept_id DEFAULT 1
+        VALUE(language)             TYPE char5 DEFAULT 'zh_CN'
+        VALUE(init_all)             TYPE abap_bool DEFAULT abap_false
+      EXPORTING
+        VALUE(rtype)                TYPE bapi_mtype
+        VALUE(rtmsg)                TYPE bapi_msg
+        VALUE(gt_ztddlistsub_total) LIKE lt_ztddlistsub .
+    METHODS init_user
+      IMPORTING
+        VALUE(dept_id)  TYPE ze_dept_id
+        VALUE(init_all) TYPE abap_bool DEFAULT abap_false
+      EXPORTING
+        VALUE(rtype)    TYPE bapi_mtype
+        VALUE(rtmsg)    TYPE bapi_msg .
+    METHODS upload_media
+      IMPORTING
+        VALUE(type)     TYPE ze_media_type
+        VALUE(header)   TYPE ANY TABLE
+        !via            TYPE string DEFAULT `FASTAPI`
+      EXPORTING
+        VALUE(media_id) TYPE string
+        VALUE(rtype)    TYPE bapi_mtype
+        VALUE(rtmsg)    TYPE bapi_msg .
+    METHODS robot_groupmessages_send
+      IMPORTING
+        VALUE(msgparam)           TYPE string
+        VALUE(msgkey)             TYPE string DEFAULT `sampleText`
+        VALUE(openconversationid) TYPE string
+        VALUE(robotcode)          TYPE string
+      EXPORTING
+        VALUE(rtype)              TYPE bapi_mtype
+        VALUE(rtmsg)              TYPE bapi_msg .
+    METHODS robot_interactivecards_send
+      IMPORTING
+        VALUE(cardtemplateid)     TYPE string
+        VALUE(openconversationid) TYPE string
+        VALUE(outtrackid)         TYPE string
+        VALUE(robotcode)          TYPE string
+        VALUE(conversationtype)   TYPE i DEFAULT 1
+        VALUE(callbackroutekey)   TYPE string OPTIONAL
+        VALUE(carddata)           LIKE lt_kv
+        VALUE(privatedata)        LIKE lt_kv OPTIONAL
+        VALUE(useridtype)         TYPE i DEFAULT 1
+      EXPORTING
+        VALUE(rtype)              TYPE bapi_mtype
+        VALUE(rtmsg)              TYPE bapi_msg .
 protected section.
 private section.
 
@@ -108,6 +138,8 @@ private section.
   constants MAXLENGTH type I value 20971520 ##NO_TEXT.
   data MY_LOGGER type ref to ZIF_LOGGER .
   constants UPLOAD_MEDIA_VIAFASTAPI_URL type STRING value `http://10.9.203.28:18888/uploadmedia` ##NO_TEXT.
+  constants ROBOT_GROUPMESSAGES_SEND_URL type STRING value `https://api.dingtalk.com/v1.0/robot/groupMessages/send` ##NO_TEXT.
+  constants ROBOT_INTERACTIVECARDS_URL type STRING value `https://api.dingtalk.com/v1.0/im/interactiveCards/send` ##NO_TEXT.
 
   methods GET_DEPTSUBALL
     importing
@@ -1306,20 +1338,9 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
         ztddlistsub_out = gt_ztddlistsub_sub.
     " 子部门也可能会有子部门，这部分也得获取到  03.06.2024 16:22:37 by kkw
 
-*    LOOP AT gt_ztddlistsub ASSIGNING FIELD-SYMBOL(<gt_ztddlistsub>).
-*      CLEAR:rtype,rtmsg,gt_ztddlistsub_sub.
-*      CALL METHOD me->get_dept
-*        EXPORTING
-*          dept_id        = <gt_ztddlistsub>-dept_id
-**         language       = 'zh_CN'
-*        IMPORTING
-**         rtype          = rtype
-**         rtmsg          = rtmsg
-*          gt_ztddlistsub = gt_ztddlistsub_sub.
     IF gt_ztddlistsub_sub IS NOT INITIAL.
       APPEND LINES OF gt_ztddlistsub_sub TO gt_ztddlistsub_total.
     ENDIF.
-*    ENDLOOP.
     IF init_all = 'X'.
       DELETE FROM ztddlistsub.
       COMMIT WORK AND WAIT.
@@ -1519,6 +1540,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
         ENDIF.
     ENDCASE.
     CALL METHOD zcl_dingtalk=>create_http_client
+*    CALL METHOD zcl_dingtalk=>create_http_client_rest
       EXPORTING
 *       input     =
         url       = url
@@ -1681,6 +1703,235 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
       ELSE.
         pure_filename = long_filename(len_f).
       ENDIF.
+    ENDIF.
+  ENDMETHOD.
+
+
+  METHOD robot_groupmessages_send.
+    TYPES: BEGIN OF t_JSON1,
+             msg_param            TYPE string,
+             msg_key              TYPE string,
+             open_conversation_id TYPE string,
+             robot_code           TYPE string,
+             cool_app_code        TYPE string,
+           END OF t_JSON1.
+    TYPES: BEGIN OF t_JSON1_out,
+             code              TYPE string,
+             requestid         TYPE string,
+             message           TYPE string,
+             process_query_key TYPE string,
+           END OF t_JSON1_out.
+    DATA:wa_in  TYPE t_JSON1,
+         wa_out TYPE t_JSON1_out.
+    TYPES:BEGIN OF ty_header,
+            name  TYPE string,
+            value TYPE string,
+            cdata TYPE string,
+            xdata TYPE xstring,
+          END OF ty_header.
+    DATA:header TYPE TABLE OF ty_header.
+
+*    获取token
+    CALL METHOD me->gettoken
+      IMPORTING
+        rtype        = rtype
+        rtmsg        = rtmsg
+        access_token = DATA(access_token).
+    IF rtype NE 'S'.
+      RETURN.
+    ENDIF.
+    wa_in-msg_param            = msgparam.
+    wa_in-msg_key              = msgkey.
+    wa_in-open_conversation_id = openconversationid.
+    wa_in-robot_code           = robotcode.
+*    wa_in-cool_app_code        = coolappcode.
+    DATA(json_in) = /ui2/cl_json=>serialize( data = wa_in  compress = abap_false pretty_name = /ui2/cl_json=>pretty_mode-camel_case ).
+    INSERT INITIAL LINE INTO TABLE header ASSIGNING FIELD-SYMBOL(<header>).
+    <header>-name   = 'x-acs-dingtalk-access-token'.
+    <header>-value  = access_token.
+    CALL METHOD zcl_dingtalk=>create_http_client
+      EXPORTING
+        input     = json_in
+        url       = robot_groupmessages_send_url
+*       username  =
+*       password  =
+        reqmethod = 'POST'
+*       http1_1   = ABAP_TRUE
+*       proxy     =
+*       bodytype  = 'JSON'
+        header    = header
+      IMPORTING
+        output    = DATA(out_put)
+        rtmsg     = DATA(otmsg)
+        status    = DATA(status).
+    /ui2/cl_json=>deserialize( EXPORTING json = out_put pretty_name = /ui2/cl_json=>pretty_mode-camel_case CHANGING data = wa_out ).
+    IF status EQ 200.
+      IF wa_out-process_query_key IS NOT INITIAL.
+        rtype = 'S'.
+        rtmsg = |发送群会话:{ openconversationid }消息返回信息:processQueryKey:{ wa_out-process_Query_Key },状态码:{ status }|.
+      ELSE.
+        rtype = 'E'.
+        rtmsg = |发送群会话:{ openconversationid }消息返回信息:message:{ wa_out-message },状态码:{ status }|.
+      ENDIF.
+    ELSE.
+      rtype = 'E'.
+      rtmsg = |发送群会话:{ openconversationid }消息发生了问题:{ otmsg },状态码:{ status }|.
+    ENDIF.
+  ENDMETHOD.
+
+
+  METHOD robot_interactivecards_send.
+    TYPES: BEGIN OF t_CARD_PARAM_MAP2,
+             title        TYPE string,
+             lable        TYPE string,
+             markdown     TYPE string,
+             hover        TYPE string,
+             but01_text   TYPE string,
+             but02_text   TYPE string,
+             but03_text   TYPE string,
+             but_status   TYPE string,
+             callback_key TYPE string,
+             rtype        TYPE string,
+             rtmsg        TYPE string,
+             pop_msg      TYPE string,
+           END OF t_CARD_PARAM_MAP2.
+    TYPES: BEGIN OF t_CARD_DATA3,
+             card_param_map TYPE t_CARD_PARAM_MAP2,
+           END OF t_CARD_DATA3.
+    TYPES: BEGIN OF t_CARD_OPTIONS4,
+             support_forward TYPE abap_bool,
+           END OF t_CARD_OPTIONS4.
+    TYPES: BEGIN OF t_JSON1,
+             card_template_id     TYPE string,
+             open_conversation_id TYPE string,
+             out_track_id         TYPE string,
+             robot_code           TYPE string,
+             conversation_type    TYPE i,
+             callback_route_key   TYPE string,
+*             card_data            TYPE t_CARD_DATA3," 通过键值对来绑定  28.06.2024 08:05:11 by kkw
+             user_id_type         TYPE i,
+             card_options         TYPE t_CARD_OPTIONS4,
+             pull_strategy        TYPE abap_bool,
+           END OF t_JSON1.
+    TYPES: BEGIN OF t_RESULT2,
+             process_query_key TYPE string,
+           END OF t_RESULT2.
+    TYPES: BEGIN OF t_JSON1_out,
+             result    TYPE t_RESULT2,
+             success   TYPE abap_bool,
+             code      TYPE string,
+             requestid TYPE string,
+             message   TYPE string,
+           END OF t_JSON1_out.
+    DATA:wa_in  TYPE t_JSON1,
+         wa_out TYPE t_JSON1_out.
+    TYPES:BEGIN OF ty_header,
+            name  TYPE string,
+            value TYPE string,
+            cdata TYPE string,
+            xdata TYPE xstring,
+          END OF ty_header.
+    DATA:header TYPE TABLE OF ty_header.
+    DATA: dref        TYPE REF TO data,
+          struct_type TYPE REF TO cl_abap_structdescr,
+          comp_tab    TYPE cl_abap_structdescr=>component_table.
+    FIELD-SYMBOLS:<stc> TYPE any.
+    CHECK carddata IS NOT INITIAL.
+    SORT carddata BY key.
+    DELETE ADJACENT DUPLICATES FROM carddata COMPARING key.
+
+*    获取token
+    CALL METHOD me->gettoken
+      IMPORTING
+        rtype        = rtype
+        rtmsg        = rtmsg
+        access_token = DATA(access_token).
+    IF rtype NE 'S'.
+      RETURN.
+    ENDIF.
+    struct_type ?= cl_abap_structdescr=>describe_by_data( p_data = wa_in ).
+    DATA(comp) = struct_type->get_components( ).
+    wa_in-card_template_id             = cardtemplateid.
+    wa_in-open_conversation_id         = openconversationid.
+    wa_in-out_track_id                 = outtrackid.
+    wa_in-robot_code                   = robotcode.
+    wa_in-conversation_type            = conversationtype.
+    wa_in-callback_route_key           = callbackroutekey.
+    wa_in-user_id_type                 = useridtype.
+    wa_in-card_options-support_forward = abap_false.
+    wa_in-pull_strategy                = abap_false.
+
+    " 构造请求体的card_data  27.06.2024 16:35:17 by kkw
+*    CLEAR:struct_type.
+*    DATA(comp_carddata) = CAST cl_abap_structdescr(
+*                               CAST cl_abap_tabledescr(
+*                               cl_abap_tabledescr=>describe_by_data( p_data = carddata )
+*                               )->get_table_line_type( )
+*                               )->get_components( ).
+    CLEAR comp_tab.
+    LOOP AT carddata ASSIGNING FIELD-SYMBOL(<carddata>).
+      INSERT INITIAL LINE INTO TABLE comp_tab ASSIGNING FIELD-SYMBOL(<comp_tab>).
+      <comp_tab>-name = <carddata>-key.
+      <comp_tab>-type ?= cl_abap_elemdescr=>get_string( ).
+    ENDLOOP.
+    " 构建出card_data的key、value结构  27.06.2024 17:20:29 by kkw
+    struct_type = cl_abap_structdescr=>create( comp_tab ).
+    " 进一步构建请求体的CARD_PARAM_MAP  27.06.2024 17:22:10 by kkw
+    CLEAR:comp_tab.
+    INSERT INITIAL LINE INTO TABLE comp_tab ASSIGNING <comp_tab>.
+    <comp_tab>-name = 'CARD_PARAM_MAP'.
+    <comp_tab>-type = struct_type.
+    struct_type = cl_abap_structdescr=>create( comp_tab ).
+    " 进一步构建请求体的CARD_DATA,插入请求体结构中
+    INSERT INITIAL LINE INTO TABLE comp ASSIGNING FIELD-SYMBOL(<comp>).
+    <comp>-name = 'CARD_DATA'.
+    <comp>-type = struct_type.
+    struct_type = cl_abap_structdescr=>create( comp ).
+    CREATE DATA dref TYPE HANDLE struct_type.
+    CHECK dref IS BOUND.
+    ASSIGN dref->* TO <stc>.
+    MOVE-CORRESPONDING wa_in TO <stc>.
+    " 将carddata的value放入请求体
+    LOOP AT carddata ASSIGNING <carddata>.
+      DATA(key) = to_upper( |CARD_DATA-CARD_PARAM_MAP-{ <carddata>-key }| ).
+      ASSIGN COMPONENT key OF STRUCTURE <stc> TO FIELD-SYMBOL(<value>).
+      IF <value> IS ASSIGNED.
+        <value> = <carddata>-value.
+        UNASSIGN <value>.
+      ENDIF.
+    ENDLOOP.
+
+    DATA(json_in) = /ui2/cl_json=>serialize( data = <stc>  compress = abap_false pretty_name = /ui2/cl_json=>pretty_mode-camel_case ).
+    INSERT INITIAL LINE INTO TABLE header ASSIGNING FIELD-SYMBOL(<header>).
+    <header>-name   = 'x-acs-dingtalk-access-token'.
+    <header>-value  = access_token.
+    CALL METHOD zcl_dingtalk=>create_http_client
+      EXPORTING
+        input     = json_in
+        url       = robot_interactivecards_url
+*       username  =
+*       password  =
+        reqmethod = 'POST'
+*       http1_1   = ABAP_TRUE
+*       proxy     =
+*       bodytype  = 'JSON'
+        header    = header
+      IMPORTING
+        output    = DATA(out_put)
+        rtmsg     = DATA(otmsg)
+        status    = DATA(status).
+    /ui2/cl_json=>deserialize( EXPORTING json = out_put pretty_name = /ui2/cl_json=>pretty_mode-camel_case CHANGING data = wa_out ).
+    IF status EQ 200.
+      IF wa_out-result-process_query_key IS NOT INITIAL.
+        rtype = 'S'.
+        rtmsg = |发送群会话:{ openconversationid }互动卡片消息返回信息:processQueryKey:{ wa_out-result-process_Query_Key },状态码:{ status }|.
+      ELSE.
+        rtype = 'E'.
+        rtmsg = |发送群会话:{ openconversationid }互动卡片消息返回信息:message:{ wa_out-message },状态码:{ status }|.
+      ENDIF.
+    ELSE.
+      rtype = 'E'.
+      rtmsg = |发送群会话:{ openconversationid }互动卡片消息发生了问题:{ otmsg },状态码:{ status }|.
     ENDIF.
   ENDMETHOD.
 ENDCLASS.

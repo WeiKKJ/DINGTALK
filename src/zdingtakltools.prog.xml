@@ -53,6 +53,30 @@
     </item>
     <item>
      <ID>S</ID>
+     <KEY>P7</KEY>
+     <ENTRY>机器人</ENTRY>
+     <LENGTH>16</LENGTH>
+    </item>
+    <item>
+     <ID>S</ID>
+     <KEY>P71</KEY>
+     <ENTRY>机器人发送群消息</ENTRY>
+     <LENGTH>16</LENGTH>
+    </item>
+    <item>
+     <ID>S</ID>
+     <KEY>P72</KEY>
+     <ENTRY>机器人发送互动卡片</ENTRY>
+     <LENGTH>17</LENGTH>
+    </item>
+    <item>
+     <ID>S</ID>
+     <KEY>P8</KEY>
+     <ENTRY>机器人发送互动卡片</ENTRY>
+     <LENGTH>17</LENGTH>
+    </item>
+    <item>
+     <ID>S</ID>
      <KEY>P_ALL</KEY>
      <ENTRY>完全初始化</ENTRY>
      <LENGTH>13</LENGTH>

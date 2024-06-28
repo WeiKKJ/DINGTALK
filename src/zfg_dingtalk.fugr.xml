@@ -1,0 +1,32 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<abapGit version="v1.0.0" serializer="LCL_OBJECT_FUGR" serializer_version="v1.0.0">
+ <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+  <asx:values>
+   <AREAT>钉钉函数组</AREAT>
+   <INCLUDES>
+    <SOBJ_NAME>LZFG_DINGTALKTOP</SOBJ_NAME>
+    <SOBJ_NAME>SAPLZFG_DINGTALK</SOBJ_NAME>
+   </INCLUDES>
+   <FUNCTIONS>
+    <item>
+     <FUNCNAME>ZFM_INTERACTIVECARDS_SEND</FUNCNAME>
+     <REMOTE_CALL>R</REMOTE_CALL>
+     <SHORT_TEXT>机器人发送钉钉互动卡片（高级版）</SHORT_TEXT>
+     <IMPORT>
+      <RSIMP>
+       <PARAMETER>WA_ZILOGDATA</PARAMETER>
+       <TYP>ZFMDATA</TYP>
+      </RSIMP>
+     </IMPORT>
+     <DOCUMENTATION>
+      <RSFDO>
+       <PARAMETER>WA_ZILOGDATA</PARAMETER>
+       <KIND>P</KIND>
+       <STEXT>zilog</STEXT>
+      </RSFDO>
+     </DOCUMENTATION>
+    </item>
+   </FUNCTIONS>
+  </asx:values>
+ </asx:abap>
+</abapGit>
