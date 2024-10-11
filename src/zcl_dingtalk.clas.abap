@@ -282,9 +282,6 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
       WHEN 'JSON'.
         http_object->request->set_header_field( name = 'Content-Type' value = 'application/json;charset=utf-8' ).
       WHEN 'FORM-DATA'.
-*        http_object->request->set_content_type( content_type = 'application/ x-www-form-urlencoded; charset=utf-8' ).
-*        http_object->request->set_header_field( name = 'charset' value = 'UTF-8' ).
-*        http_object->request->set_header_field( name = 'accept-language' value = 'zh-CN' ).
         http_object->request->set_header_field( name = 'Content-Type' value = 'multipart/form-data' ).
     ENDCASE.
 
@@ -404,7 +401,8 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
           offset = 0
           length = length.
     ENDIF.
-
+    DATA fff TYPE tihttpnvp.
+    http_object->request->get_header_fields( CHANGING fields = fff ).
 
 *发送HTTP请求
     CALL METHOD http_object->send
@@ -1227,7 +1225,6 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
       CATCH cx_abap_message_digest.
         EXIT.
     ENDTRY.
-    DATA(newline) = cl_abap_char_utilities=>newline.
     GET TIME STAMP FIELD stamp.
     stamp_char = stamp.
     CALL METHOD cl_pco_utility=>convert_abap_timestamp_to_java
@@ -1237,7 +1234,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
         iv_msec      = CONV #( stamp_char+15(3) )
       IMPORTING
         ev_timestamp = timestamp.
-    if_data_s = |{ timestamp }{ newline }{ secret }|.
+    if_data_s = |{ timestamp }{ cl_abap_char_utilities=>newline }{ secret }|.
     TRY.
         if_data = cl_abap_hmac=>string_to_xstring( if_data_s ).
       CATCH cx_abap_message_digest.
@@ -1931,7 +1928,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
       ENDIF.
     ELSE.
       rtype = 'E'.
-      rtmsg = |发送群会话:{ openconversationid }互动卡片消息发生了问题:{ otmsg },状态码:{ status }|.
+      rtmsg = |发送群会话:{ openconversationid }互动卡片消息发生了问题:{ otmsg }&{ wa_out-message },状态码:{ status }|.
     ENDIF.
   ENDMETHOD.
 ENDCLASS.

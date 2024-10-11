@@ -12,6 +12,7 @@ FUNCTION zfm_interactivecards_send.
   DATA:openconversationid TYPE string.
   CONSTANTS newline TYPE abap_char1 VALUE cl_abap_char_utilities=>newline.
   CONSTANTS vertical_tab TYPE abap_char1 VALUE '|'."cl_abap_char_utilities=>vertical_tab.
+  DATA:my_logger TYPE REF TO zif_logger.
   DATA:BEGIN OF zabapkeystr,
          name  TYPE zabap_log-name,
          erdat TYPE zabap_log-erdat,
@@ -19,8 +20,17 @@ FUNCTION zfm_interactivecards_send.
        END OF zabapkeystr.
   DATA:wa_abapdata TYPE zabap_log.
   CHECK wa_zilogdata IS NOT INITIAL.
+  my_logger = zcl_logger_factory=>create_log(
+                        object    = 'ZDINGTALK'
+                        subobject = 'ZDT_CARD'
+                        desc      = 'ZFM_INTERACTIVECARDS_SEND'
+                        settings = zcl_logger_factory=>create_settings( ) ) ##no_text.
   SELECT SINGLE * FROM ztddconfig WHERE name LIKE '%SAP推送通知%' INTO @DATA(wa_ddconfig).
-  CHECK NOT wa_ddconfig-cardtemplateid IS INITIAL OR NOT wa_ddconfig-openconversationid IS INITIAL OR NOT wa_ddconfig-callbackroutekey IS INITIAL.
+  IF wa_ddconfig-cardtemplateid IS INITIAL OR wa_ddconfig-openconversationid IS INITIAL OR wa_ddconfig-callbackroutekey IS INITIAL.
+    my_logger->e( obj_to_log = |未能从ztddconfig表查询到name包含'SAP推送通知'的配置| ) .
+    RETURN.
+  ENDIF.
+  SELECT SINGLE * FROM tftit WHERE funcname = @wa_zilogdata-name AND spras = @sy-langu INTO @DATA(wa_tftit).
   MOVE-CORRESPONDING wa_zilogdata TO zabapkeystr.
   MOVE-CORRESPONDING wa_zilogdata TO wa_abapdata.
 
@@ -43,6 +53,7 @@ FUNCTION zfm_interactivecards_send.
   INSERT INITIAL LINE INTO TABLE carddata ASSIGNING <carddata>.
   <carddata>-key = 'markdown'.
   <carddata>-value = |#### SAP接口名:{ wa_zilogdata-name }{ newline }|
+                  && |#### 接口描述:{ wa_tftit-stext }{ newline }|
 *                  && |{ vertical_tab } 函数名 { vertical_tab } 记录创建日期 { vertical_tab } 时间戳 { vertical_tab }  消息文本 { vertical_tab }{ newline }|
 *                  && |{ vertical_tab } :- { vertical_tab } :-: { vertical_tab } -: { vertical_tab } :- { vertical_tab }{ newline }|
 *                  && |{ vertical_tab } { wa_zilogdata-name } { vertical_tab } { wa_zilogdata-erdat } { vertical_tab } { wa_zilogdata-stamp } { vertical_tab } { wa_zilogdata-rtmsg } { vertical_tab }{ newline }|
@@ -108,5 +119,7 @@ FUNCTION zfm_interactivecards_send.
     IMPORTING
       rtype              = rtype
       rtmsg              = rtmsg.
-
+  IF rtype = 'E'.
+    my_logger->i( obj_to_log = rtmsg ) .
+  ENDIF.
 ENDFUNCTION.
