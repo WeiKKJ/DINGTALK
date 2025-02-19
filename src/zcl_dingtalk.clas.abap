@@ -385,6 +385,8 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
                 http_entity->set_data( data = xdata offset = 0 length = length ).
               ENDIF.
             ENDLOOP.
+*            DATA eee TYPE tihttpnvp.
+*            http_entity->get_header_fields( CHANGING fields = eee ).
           WHEN OTHERS.
             http_object->request->set_header_field( name = name value = value ).
         ENDCASE.
@@ -401,8 +403,8 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
           offset = 0
           length = length.
     ENDIF.
-    DATA fff TYPE tihttpnvp.
-    http_object->request->get_header_fields( CHANGING fields = fff ).
+*    DATA fff TYPE tihttpnvp.
+*    http_object->request->get_header_fields( CHANGING fields = fff ).
 
 *发送HTTP请求
     CALL METHOD http_object->send
