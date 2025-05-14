@@ -1,129 +1,130 @@
-CLASS zcl_dingtalk DEFINITION
-  PUBLIC
-  FINAL
-  CREATE PUBLIC .
+class ZCL_DINGTALK definition
+  public
+  final
+  create public .
 
-  PUBLIC SECTION.
+public section.
 
-    TYPES:
-      BEGIN OF ty_excel,
+  types:
+    BEGIN OF ty_excel,
         excel_tabdref   TYPE REF TO data,
         excel_fieldcat  TYPE zexcel_t_fieldcatalog,
         excel_sheetname TYPE zexcel_sheet_title,
       END OF ty_excel .
-    TYPES:
-      BEGIN OF ty_kv,
+  types:
+    BEGIN OF ty_kv,
         key   TYPE string,
         value TYPE string,
       END OF ty_kv .
 
-    CLASS-DATA:
-      lt_ztddlistsub TYPE TABLE OF ztddlistsub .
-    CLASS-DATA:
-      lt_userid_list TYPE TABLE OF ztdduser-userid .
-    CLASS-DATA:
-      lt_ztdduser  TYPE TABLE OF ztdduser .
-    CLASS-DATA:
-      exceltab  TYPE TABLE OF ty_excel .
-    CLASS-DATA:
-     lt_kv TYPE TABLE OF ty_kv .
+  class-data:
+    lt_ztddlistsub TYPE TABLE OF ztddlistsub .
+  class-data:
+    lt_userid_list TYPE TABLE OF ztdduser-userid .
+  class-data:
+    lt_ztdduser  TYPE TABLE OF ztdduser .
+  class-data:
+    exceltab  TYPE TABLE OF ty_excel .
+  class-data:
+    lt_kv TYPE TABLE OF ty_kv .
 
-    METHODS constructor
-      IMPORTING
-        VALUE(appid) TYPE ze_appid .
-    CLASS-METHODS create_http_client
-      IMPORTING
-        VALUE(input)     TYPE string OPTIONAL
-        VALUE(url)       TYPE string
-        VALUE(username)  TYPE string OPTIONAL
-        VALUE(password)  TYPE string OPTIONAL
-        VALUE(reqmethod) TYPE char4
-        VALUE(http1_1)   TYPE abap_bool DEFAULT abap_true
-        VALUE(proxy)     TYPE string OPTIONAL
-        VALUE(bodytype)  TYPE string DEFAULT 'JSON'
-        VALUE(header)    TYPE STANDARD TABLE OPTIONAL
-      EXPORTING
-        VALUE(output)    TYPE string
-        VALUE(rtmsg)     TYPE string
-        VALUE(status)    TYPE i .
-    CLASS-METHODS split_filename
-      IMPORTING
-        VALUE(long_filename)  TYPE char255
-      EXPORTING
-        VALUE(pure_filename)  TYPE char255
-        VALUE(pure_extension) TYPE char10 .
-    CLASS-METHODS create_excel
-      IMPORTING
-        VALUE(gt_exceltab)  LIKE exceltab
-      RETURNING
-        VALUE(xstring_data) TYPE xstring .
-    METHODS post2ddrobot
-      IMPORTING
-        VALUE(msgtype) TYPE ze_msgtype DEFAULT 'text'
-        VALUE(title)   TYPE string OPTIONAL
-        VALUE(text)    TYPE string OPTIONAL
-      EXPORTING
-        VALUE(rtype)   TYPE bapi_mtype
-        VALUE(rtmsg)   TYPE bapi_msg .
-    METHODS post2corpconversation
-      IMPORTING
-        VALUE(msgtype)  TYPE ze_msgtype DEFAULT 'text'
-        VALUE(userid)   TYPE string
-        VALUE(title)    TYPE string OPTIONAL
-        VALUE(text)     TYPE string OPTIONAL
-        VALUE(media_id) TYPE ze_media_id OPTIONAL
-        VALUE(duration) TYPE i OPTIONAL
-      EXPORTING
-        VALUE(rtype)    TYPE bapi_mtype
-        VALUE(rtmsg)    TYPE bapi_msg .
-    METHODS init_dept
-      IMPORTING
-        VALUE(dept_id)              TYPE ze_dept_id DEFAULT 1
-        VALUE(language)             TYPE char5 DEFAULT 'zh_CN'
-        VALUE(init_all)             TYPE abap_bool DEFAULT abap_false
-      EXPORTING
-        VALUE(rtype)                TYPE bapi_mtype
-        VALUE(rtmsg)                TYPE bapi_msg
-        VALUE(gt_ztddlistsub_total) LIKE lt_ztddlistsub .
-    METHODS init_user
-      IMPORTING
-        VALUE(dept_id)  TYPE ze_dept_id
-        VALUE(init_all) TYPE abap_bool DEFAULT abap_false
-      EXPORTING
-        VALUE(rtype)    TYPE bapi_mtype
-        VALUE(rtmsg)    TYPE bapi_msg .
-    METHODS upload_media
-      IMPORTING
-        VALUE(type)     TYPE ze_media_type
-        VALUE(header)   TYPE ANY TABLE
-        !via            TYPE string DEFAULT `FASTAPI`
-      EXPORTING
-        VALUE(media_id) TYPE string
-        VALUE(rtype)    TYPE bapi_mtype
-        VALUE(rtmsg)    TYPE bapi_msg .
-    METHODS robot_groupmessages_send
-      IMPORTING
-        VALUE(msgparam)           TYPE string
-        VALUE(msgkey)             TYPE string DEFAULT `sampleText`
-        VALUE(openconversationid) TYPE string
-        VALUE(robotcode)          TYPE string
-      EXPORTING
-        VALUE(rtype)              TYPE bapi_mtype
-        VALUE(rtmsg)              TYPE bapi_msg .
-    METHODS robot_interactivecards_send
-      IMPORTING
-        VALUE(cardtemplateid)     TYPE string
-        VALUE(openconversationid) TYPE string
-        VALUE(outtrackid)         TYPE string
-        VALUE(robotcode)          TYPE string
-        VALUE(conversationtype)   TYPE i DEFAULT 1
-        VALUE(callbackroutekey)   TYPE string OPTIONAL
-        VALUE(carddata)           LIKE lt_kv
-        VALUE(privatedata)        LIKE lt_kv OPTIONAL
-        VALUE(useridtype)         TYPE i DEFAULT 1
-      EXPORTING
-        VALUE(rtype)              TYPE bapi_mtype
-        VALUE(rtmsg)              TYPE bapi_msg .
+  methods CONSTRUCTOR
+    importing
+      value(APPID) type ZE_APPID .
+  class-methods CREATE_HTTP_CLIENT
+    importing
+      value(INPUT) type STRING optional
+      value(URL) type STRING
+      value(USERNAME) type STRING optional
+      value(PASSWORD) type STRING optional
+      value(REQMETHOD) type CHAR4
+      value(HTTP1_1) type ABAP_BOOL default ABAP_TRUE
+      value(PROXY) type STRING optional
+      value(BODYTYPE) type STRING default 'JSON'
+      value(HEADER) type STANDARD TABLE optional
+    exporting
+      value(OUTPUT) type STRING
+      value(RTMSG) type STRING
+      value(STATUS) type I
+      value(FIELDS) type TIHTTPNVP .
+  class-methods SPLIT_FILENAME
+    importing
+      value(LONG_FILENAME) type CHAR255
+    exporting
+      value(PURE_FILENAME) type CHAR255
+      value(PURE_EXTENSION) type CHAR10 .
+  class-methods CREATE_EXCEL
+    importing
+      value(GT_EXCELTAB) like EXCELTAB
+    returning
+      value(XSTRING_DATA) type XSTRING .
+  methods POST2DDROBOT
+    importing
+      value(MSGTYPE) type ZE_MSGTYPE default 'text'
+      value(TITLE) type STRING optional
+      value(TEXT) type STRING optional
+    exporting
+      value(RTYPE) type BAPI_MTYPE
+      value(RTMSG) type BAPI_MSG .
+  methods POST2CORPCONVERSATION
+    importing
+      value(MSGTYPE) type ZE_MSGTYPE default 'text'
+      value(USERID) type STRING
+      value(TITLE) type STRING optional
+      value(TEXT) type STRING optional
+      value(MEDIA_ID) type ZE_MEDIA_ID optional
+      value(DURATION) type I optional
+    exporting
+      value(RTYPE) type BAPI_MTYPE
+      value(RTMSG) type BAPI_MSG .
+  methods INIT_DEPT
+    importing
+      value(DEPT_ID) type ZE_DEPT_ID default 1
+      value(LANGUAGE) type CHAR5 default 'zh_CN'
+      value(INIT_ALL) type ABAP_BOOL default ABAP_FALSE
+    exporting
+      value(RTYPE) type BAPI_MTYPE
+      value(RTMSG) type BAPI_MSG
+      value(GT_ZTDDLISTSUB_TOTAL) like LT_ZTDDLISTSUB .
+  methods INIT_USER
+    importing
+      value(DEPT_ID) type ZE_DEPT_ID
+      value(INIT_ALL) type ABAP_BOOL default ABAP_FALSE
+    exporting
+      value(RTYPE) type BAPI_MTYPE
+      value(RTMSG) type BAPI_MSG .
+  methods UPLOAD_MEDIA
+    importing
+      value(TYPE) type ZE_MEDIA_TYPE
+      value(HEADER) type ANY TABLE
+      !VIA type STRING default `FASTAPI`
+    exporting
+      value(MEDIA_ID) type STRING
+      value(RTYPE) type BAPI_MTYPE
+      value(RTMSG) type BAPI_MSG .
+  methods ROBOT_GROUPMESSAGES_SEND
+    importing
+      value(MSGPARAM) type STRING
+      value(MSGKEY) type STRING default `sampleText`
+      value(OPENCONVERSATIONID) type STRING
+      value(ROBOTCODE) type STRING
+    exporting
+      value(RTYPE) type BAPI_MTYPE
+      value(RTMSG) type BAPI_MSG .
+  methods ROBOT_INTERACTIVECARDS_SEND
+    importing
+      value(CARDTEMPLATEID) type STRING
+      value(OPENCONVERSATIONID) type STRING
+      value(OUTTRACKID) type STRING
+      value(ROBOTCODE) type STRING
+      value(CONVERSATIONTYPE) type I default 1
+      value(CALLBACKROUTEKEY) type STRING optional
+      value(CARDDATA) like LT_KV
+      value(PRIVATEDATA) like LT_KV optional
+      value(USERIDTYPE) type I default 1
+    exporting
+      value(RTYPE) type BAPI_MTYPE
+      value(RTMSG) type BAPI_MSG .
 protected section.
 private section.
 
@@ -201,11 +202,8 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
          proxy_passwd  TYPE string,
          http_object   TYPE REF TO if_http_client,
          http_entity   TYPE REF TO if_http_entity, "http实体
-         length        TYPE i,
-         fields        TYPE tihttpnvp,
-         it_ihttpnvp   TYPE TABLE OF ihttpnvp.
-    DATA:lv_content_disposition TYPE string,
-         lv_content_type        TYPE string.
+         length        TYPE i.
+    DATA:lv_content_type TYPE string.
     DATA:long_filename  TYPE char255,
          pure_filename  TYPE char255,
          pure_extension TYPE char10.
@@ -216,8 +214,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
                   <fs_xdata> TYPE any.
 
     CLEAR:output,length,rtmsg,name,value,status,
-    pure_filename,pure_extension,
-    lv_content_disposition,lv_content_type,
+    pure_filename,pure_extension,lv_content_type,
     proxy_service,proxy_host,proxy_user,proxy_passwd.
 
     length = strlen( input ).
@@ -289,26 +286,27 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
     LOOP AT header ASSIGNING <wa>.
       CLEAR:name,value,cdata,xdata.
       ASSIGN COMPONENT 'NAME' OF STRUCTURE <wa> TO <fs_name>.
-      IF sy-subrc NE 0.
-        RETURN.
+      IF sy-subrc EQ 0.
+        name = <fs_name>.
       ENDIF.
       ASSIGN COMPONENT 'VALUE' OF STRUCTURE <wa> TO <fs_value>.
-      IF sy-subrc NE 0.
-        RETURN.
+      IF sy-subrc EQ 0.
+        value = <fs_value>.
       ENDIF.
       ASSIGN COMPONENT 'CDATA' OF STRUCTURE <wa> TO <fs_cdata>.
-      IF sy-subrc NE 0.
-        RETURN.
+      IF sy-subrc EQ 0.
+        cdata = <fs_cdata>.
       ENDIF.
       ASSIGN COMPONENT 'XDATA' OF STRUCTURE <wa> TO <fs_xdata>.
-      IF sy-subrc NE 0.
-        RETURN.
+      IF sy-subrc EQ 0.
+        xdata = <fs_xdata>.
       ENDIF.
-      CHECK <fs_name> IS NOT INITIAL AND <fs_value> IS NOT INITIAL.
-      name = <fs_name>.
-      value = <fs_value>.
-      cdata = <fs_cdata>.
-      xdata = <fs_xdata>.
+      CHECK name IS NOT INITIAL AND value IS NOT INITIAL.
+*      CHECK <fs_name> IS NOT INITIAL AND <fs_value> IS NOT INITIAL.
+*      name = <fs_name>.
+*      value = <fs_value>.
+*      cdata = <fs_cdata>.
+*      xdata = <fs_xdata>.
       IF bodytype = 'JSON'.
         http_object->request->set_header_field( name = name value = value ).
 *设置下 content_type
