@@ -46,7 +46,8 @@ public section.
       value(OUTPUT) type STRING
       value(RTMSG) type STRING
       value(STATUS) type I
-      value(FIELDS) type TIHTTPNVP .
+      value(FIELDS) type TIHTTPNVP
+      value(OUTPUTX) type XSTRING .
   class-methods SPLIT_FILENAME
     importing
       value(LONG_FILENAME) type CHAR255
@@ -191,8 +192,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
 
 
   METHOD create_http_client.
-    DATA:message       TYPE string,
-         name          TYPE string,
+    DATA:name          TYPE string,
          value         TYPE string,
          cdata         TYPE string,
          xdata         TYPE xstring,
@@ -213,11 +213,10 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
                   <fs_cdata> TYPE any,
                   <fs_xdata> TYPE any.
 
-    CLEAR:output,length,rtmsg,name,value,status,
+    CLEAR:output,length,rtmsg,name,value,status,outputx,fields,
     pure_filename,pure_extension,lv_content_type,
     proxy_service,proxy_host,proxy_user,proxy_passwd.
 
-    length = strlen( input ).
     IF proxy IS NOT INITIAL.
       SPLIT proxy AT '/'
       INTO proxy_host proxy_service proxy_user proxy_passwd.
@@ -238,8 +237,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
         internal_error     = 3
         OTHERS             = 4.
     IF sy-subrc NE 0.
-      http_object->get_last_error( IMPORTING message = message ).
-      rtmsg = message.
+      http_object->get_last_error( IMPORTING message = rtmsg code = status ).
       RETURN.
     ENDIF.
 
@@ -254,7 +252,6 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
       http_object->request->set_version( if_http_request=>co_protocol_version_1_0 ).
     ENDIF.
 
-
 *将HTTP代理设置为POST
     CASE reqmethod.
       WHEN 'POST'.
@@ -262,13 +259,12 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
       WHEN 'GET'.
         http_object->request->set_method( if_http_request=>co_request_method_get ).
       WHEN OTHERS.
-        rtmsg = '请求类型必填'.
+        rtmsg = |暂不支持请求类型[{ reqmethod }]|.
         RETURN.
     ENDCASE.
 
 *设置账号密码
-    IF username IS NOT INITIAL
-    AND password IS NOT INITIAL.
+    IF username IS NOT INITIAL AND password IS NOT INITIAL.
       CALL METHOD http_object->authenticate
         EXPORTING
           username = username
@@ -302,11 +298,6 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
         xdata = <fs_xdata>.
       ENDIF.
       CHECK name IS NOT INITIAL AND value IS NOT INITIAL.
-*      CHECK <fs_name> IS NOT INITIAL AND <fs_value> IS NOT INITIAL.
-*      name = <fs_name>.
-*      value = <fs_value>.
-*      cdata = <fs_cdata>.
-*      xdata = <fs_xdata>.
       IF bodytype = 'JSON'.
         http_object->request->set_header_field( name = name value = value ).
 *设置下 content_type
@@ -339,7 +330,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
                     pure_filename  = pure_filename
                     pure_extension = pure_extension.
 
-                CASE pure_extension.
+                CASE to_lower( pure_extension ).
                   WHEN 'rar'.
                     lv_content_type = 'application/x-rar-compressed'.
                   WHEN 'pdf'.
@@ -395,6 +386,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
 
 *输入发送数据
     IF input IS NOT INITIAL.
+      length = strlen( input ).
       CALL METHOD http_object->request->set_cdata
         EXPORTING
           data   = input
@@ -411,8 +403,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
         http_invalid_state         = 2
         OTHERS                     = 3.
     IF sy-subrc NE 0.
-      http_object->get_last_error( IMPORTING message = message ).
-      rtmsg = message.
+      http_object->get_last_error( IMPORTING message = rtmsg code = status  ).
       http_object->close( ).
       RETURN.
     ENDIF.
@@ -424,38 +415,31 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
         http_processing_failed     = 3
         OTHERS                     = 4.
     IF sy-subrc NE 0.
-      http_object->get_last_error( IMPORTING message = message ).
-      rtmsg = message.
+      http_object->get_last_error( IMPORTING message = rtmsg code = status  ).
       http_object->close( ).
       RETURN.
     ENDIF.
 *获取结果
-    CLEAR:length.
-    CALL METHOD http_object->response->get_status
-      IMPORTING
-        code   = length
-        reason = message.
-    rtmsg = message.
-    status = length.
+    CALL METHOD http_object->response->get_status( IMPORTING reason = rtmsg code = status ).
 *获取返回
     CALL METHOD http_object->response->get_header_fields
       CHANGING
         fields = fields.
-    name = http_object->response->get_cdata( ).
+    output = http_object->response->get_cdata( ).
     IF sy-subrc NE 0.
-      http_object->get_last_error( IMPORTING message = message ).
-      rtmsg = message.
+      http_object->get_last_error( IMPORTING message = rtmsg code = status ).
       http_object->close( ).
       RETURN.
     ENDIF.
-    value = http_object->response->get_data( ).
-* 将返回参数的回车转换，否则回车会在SAP变成'#'
-*  REPLACE ALL OCCURRENCES OF REGEX '\n' IN name WITH ''.
+    outputx = http_object->response->get_data( ).
+    IF sy-subrc NE 0.
+      http_object->get_last_error( IMPORTING message = rtmsg code = status ).
+      http_object->close( ).
+      RETURN.
+    ENDIF.
 *关闭HTTP连接
 
     http_object->close( ).
-
-    output = name.
 
   ENDMETHOD.
 
