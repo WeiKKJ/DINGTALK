@@ -461,15 +461,15 @@ FORM upload_media USING p_filename p_xstr CHANGING p_media_id p_rtype p_rtmsg.
          xdata TYPE xstring,
        END OF header.
   DATA:lv_content_disposition TYPE string.
-  DATA:pure_filename    TYPE char255,
-       pure_extension   TYPE char10,
+  DATA:pure_filename    TYPE string,
+       pure_extension   TYPE string,
        file_name_encode TYPE savwctxt-fieldcont.
   CHECK cl_dingtalk IS BOUND.
   CLEAR:p_media_id,p_rtype,p_rtmsg.
   " 分割文件名和扩展名  29.04.2024 09:47:45 by kkw
   CALL METHOD zcl_dingtalk=>split_filename
     EXPORTING
-      long_filename  = CONV char255( p_filename )
+      long_filename  = CONV string( p_filename )
     IMPORTING
       pure_filename  = pure_filename
       pure_extension = pure_extension.
@@ -486,7 +486,7 @@ FORM upload_media USING p_filename p_xstr CHANGING p_media_id p_rtype p_rtmsg.
       value_encoded = file_name_encode.
   CLEAR:header,header[].
   header-name = 'Content-Disposition'.
-  lv_content_disposition = |form-data; name="media"; filename="{ pure_filename }.{ pure_extension }"|.
+  lv_content_disposition = |form-data; name="media"; filename="{ pure_filename }{ pure_extension }"|.
   header-value = lv_content_disposition.
   header-xdata = p_xstr.
   APPEND header.
@@ -581,15 +581,15 @@ FORM upload_media_viafastapi USING p_filename p_xstr CHANGING p_media_id p_rtype
          xdata TYPE xstring,
        END OF header.
   DATA:lv_content_disposition TYPE string.
-  DATA:pure_filename    TYPE char255,
-       pure_extension   TYPE char10,
+  DATA:pure_filename    TYPE string,
+       pure_extension   TYPE string,
        file_name_encode TYPE savwctxt-fieldcont.
   CHECK cl_dingtalk IS BOUND.
   CLEAR:p_media_id,p_rtype,p_rtmsg.
   " 分割文件名和扩展名  29.04.2024 09:47:45 by kkw
   CALL METHOD zcl_dingtalk=>split_filename
     EXPORTING
-      long_filename  = CONV char255( p_filename )
+      long_filename  = CONV string( p_filename )
     IMPORTING
       pure_filename  = pure_filename
       pure_extension = pure_extension.
@@ -607,7 +607,7 @@ FORM upload_media_viafastapi USING p_filename p_xstr CHANGING p_media_id p_rtype
   CLEAR:header,header[].
   header-name = 'Content-Disposition'.
 *  lv_content_disposition = |form-data; name="file"; filename="{ pure_filename }.{ pure_extension }"|.
-  lv_content_disposition = |form-data; name="media"; filename="{ file_name_encode }.{ pure_extension }"|.
+  lv_content_disposition = |form-data; name="media"; filename="{ file_name_encode }{ pure_extension }"|.
   header-value = lv_content_disposition.
   header-xdata = p_xstr.
   APPEND header.

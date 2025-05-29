@@ -50,10 +50,11 @@ public section.
       value(OUTPUTX) type XSTRING .
   class-methods SPLIT_FILENAME
     importing
-      value(LONG_FILENAME) type CHAR255
+      value(OPSYS) type SY-OPSYS default 'Windows NT'
+      value(LONG_FILENAME) type STRING
     exporting
-      value(PURE_FILENAME) type CHAR255
-      value(PURE_EXTENSION) type CHAR10 .
+      value(PURE_FILENAME) type STRING
+      value(PURE_EXTENSION) type STRING .
   class-methods CREATE_EXCEL
     importing
       value(GT_EXCELTAB) like EXCELTAB
@@ -205,8 +206,8 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
          length        TYPE i.
     DATA:lv_content_type TYPE string.
     DATA:long_filename  TYPE char255,
-         pure_filename  TYPE char255,
-         pure_extension TYPE char10.
+         pure_filename  TYPE string,
+         pure_extension TYPE string.
     FIELD-SYMBOLS:<wa>       TYPE any,
                   <fs_name>  TYPE any,
                   <fs_value> TYPE any,
@@ -325,47 +326,47 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
                                          occ  = 0 ).
                 CALL METHOD zcl_dingtalk=>split_filename
                   EXPORTING
-                    long_filename  = long_filename
+                    long_filename  = CONV string( long_filename )
                   IMPORTING
                     pure_filename  = pure_filename
                     pure_extension = pure_extension.
 
                 CASE to_lower( pure_extension ).
-                  WHEN 'rar'.
+                  WHEN '.rar'.
                     lv_content_type = 'application/x-rar-compressed'.
-                  WHEN 'pdf'.
+                  WHEN '.pdf'.
                     lv_content_type = 'application/pdf'.
-                  WHEN 'zip'.
+                  WHEN '.zip'.
                     lv_content_type = 'application/zip'.
-                  WHEN 'pptx'.
+                  WHEN '.pptx'.
                     lv_content_type = 'application/vnd.openxmlformats-officedocument.presentationml.presentation'.
-                  WHEN 'ppt'.
+                  WHEN '.ppt'.
                     lv_content_type = 'application/vnd.ms-powerpoint'.
-                  WHEN 'xlsx'.
+                  WHEN '.xlsx'.
                     lv_content_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'.
-                  WHEN 'xls'.
+                  WHEN '.xls'.
                     lv_content_type = 'application/vnd.ms-excel'.
-                  WHEN 'docx'.
+                  WHEN '.docx'.
                     lv_content_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'.
-                  WHEN 'doc'.
+                  WHEN '.doc'.
                     lv_content_type = 'application/msword'.
-                  WHEN 'mp4'.
+                  WHEN '.mp4'.
                     lv_content_type = 'video/mp4'.
-                  WHEN 'wav'.
+                  WHEN '.wav'.
                     lv_content_type = 'audio/wav'.
-                  WHEN 'mp3'.
+                  WHEN '.mp3'.
                     lv_content_type = 'audio/mpeg'.
-                  WHEN 'amr'.
+                  WHEN '.amr'.
                     lv_content_type = 'audio/amr'.
-                  WHEN 'bmp'.
+                  WHEN '.bmp'.
                     lv_content_type = 'image/bmp'.
-                  WHEN 'gif'.
+                  WHEN '.gif'.
                     lv_content_type = 'image/gif'.
-                  WHEN 'jpg'.
+                  WHEN '.jpg'.
                     lv_content_type = 'image/jpeg'.
-                  WHEN 'png'.
+                  WHEN '.png'.
                     lv_content_type = 'image/png'.
-                  WHEN 'txt'.
+                  WHEN '.txt'.
                     lv_content_type = 'text/plain'.
                 ENDCASE.
                 http_entity->set_content_type( lv_content_type ).
@@ -1638,53 +1639,62 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
   ENDMETHOD.
 
 
-  METHOD SPLIT_FILENAME.
-    DATA: len             TYPE i,
-          len_f           TYPE i,
-          pos             TYPE i,
-          char            TYPE c,
-          long_filename_f TYPE dbmsgora-filename.
-    " 找扩展名  29.04.2024 19:56:14 by kkw
-    len = strlen( long_filename ).
-    CHECK len GT 0.
-    pos = len.
-    DO len TIMES.
-      pos = pos - 1.
-      char = long_filename+pos(1).
-      IF char ='.'.
-        len = len - pos.
-        pos = pos + 1.
-        pure_extension = long_filename+pos(len).
-        TRANSLATE pure_extension TO LOWER CASE.
-        EXIT.
-      ENDIF.
-    ENDDO.
-    " 找文件名  29.04.2024 19:56:56 by kkw
-    IF pure_extension IS INITIAL.
-      len_f = len.
-    ELSE.
-      len_f = strlen( long_filename ) - strlen( pure_extension ) - 1.
-    ENDIF.
-
-    long_filename_f = long_filename(len_f).
-    pos = len_f.
-    DO len_f TIMES.
-      pos = pos - 1.
-      char = long_filename_f+pos(1).
-      IF char = '\' OR char = '/'.
-        len_f = len_f - pos.
-        pos = pos + 1.
-        pure_filename = long_filename_f+pos(len_f).
-        EXIT.
-      ENDIF.
-    ENDDO.
-    IF pure_filename IS INITIAL.
-      IF pure_extension IS INITIAL.
-        pure_filename = long_filename.
-      ELSE.
-        pure_filename = long_filename(len_f).
-      ENDIF.
-    ENDIF.
+  METHOD split_filename.
+    DATA(opsyso) = sy-opsys.
+    sy-opsys = opsys.
+    DATA(zcl_fs_windows_path) = cl_fs_windows_path=>create( name = long_filename ).
+*    DATA(file_name) = zcl_fs_windows_path->get_file_name( ).
+    pure_filename = zcl_fs_windows_path->get_file_base_name( ).
+    pure_extension = zcl_fs_windows_path->get_file_extension( ).
+*    DATA(path_name) = zcl_fs_windows_path->get_path_name( ).
+*    DATA(path_component) = zcl_fs_windows_path->get_path_component( ).
+    sy-opsys = opsyso.
+***    DATA: len             TYPE i,
+***          len_f           TYPE i,
+***          pos             TYPE i,
+***          char            TYPE c,
+***          long_filename_f TYPE dbmsgora-filename.
+***    " 找扩展名  29.04.2024 19:56:14 by kkw
+***    len = strlen( long_filename ).
+***    CHECK len GT 0.
+***    pos = len.
+***    DO len TIMES.
+***      pos = pos - 1.
+***      char = long_filename+pos(1).
+***      IF char ='.'.
+***        len = len - pos.
+***        pos = pos + 1.
+***        pure_extension = long_filename+pos(len).
+***        TRANSLATE pure_extension TO LOWER CASE.
+***        EXIT.
+***      ENDIF.
+***    ENDDO.
+***    " 找文件名  29.04.2024 19:56:56 by kkw
+***    IF pure_extension IS INITIAL.
+***      len_f = len.
+***    ELSE.
+***      len_f = strlen( long_filename ) - strlen( pure_extension ) - 1.
+***    ENDIF.
+***
+***    long_filename_f = long_filename(len_f).
+***    pos = len_f.
+***    DO len_f TIMES.
+***      pos = pos - 1.
+***      char = long_filename_f+pos(1).
+***      IF char = '\' OR char = '/'.
+***        len_f = len_f - pos.
+***        pos = pos + 1.
+***        pure_filename = long_filename_f+pos(len_f).
+***        EXIT.
+***      ENDIF.
+***    ENDDO.
+***    IF pure_filename IS INITIAL.
+***      IF pure_extension IS INITIAL.
+***        pure_filename = long_filename.
+***      ELSE.
+***        pure_filename = long_filename(len_f).
+***      ENDIF.
+***    ENDIF.
   ENDMETHOD.
 
 
