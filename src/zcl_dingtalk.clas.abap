@@ -237,7 +237,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
         plugin_not_active  = 2
         internal_error     = 3
         OTHERS             = 4.
-    IF sy-subrc NE 0.
+    IF sy-subrc NE 0 OR http_object IS NOT BOUND.
       http_object->get_last_error( IMPORTING message = rtmsg code = status ).
       RETURN.
     ENDIF.
@@ -1642,12 +1642,12 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
   METHOD split_filename.
     DATA(opsyso) = sy-opsys.
     sy-opsys = opsys.
-    DATA(zcl_fs_windows_path) = cl_fs_windows_path=>create( name = long_filename ).
-*    DATA(file_name) = zcl_fs_windows_path->get_file_name( ).
-    pure_filename = zcl_fs_windows_path->get_file_base_name( ).
-    pure_extension = zcl_fs_windows_path->get_file_extension( ).
-*    DATA(path_name) = zcl_fs_windows_path->get_path_name( ).
-*    DATA(path_component) = zcl_fs_windows_path->get_path_component( ).
+    DATA(zcl_fs_path) = cl_fs_path=>create( name = long_filename ).
+*    DATA(file_name) = zcl_fs_path->get_file_name( ).
+    pure_filename = zcl_fs_path->get_file_base_name( ).
+    pure_extension = zcl_fs_path->get_file_extension( ).
+*    DATA(path_name) = zcl_fs_path->get_path_name( ).
+*    DATA(path_component) = zcl_fs_path->get_path_component( ).
     sy-opsys = opsyso.
 ***    DATA: len             TYPE i,
 ***          len_f           TYPE i,
