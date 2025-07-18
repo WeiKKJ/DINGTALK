@@ -4,7 +4,6 @@ FUNCTION zfm_interactivecards_send.
 *"  IMPORTING
 *"     VALUE(WA_ZILOGDATA) TYPE  ZFMDATA
 *"----------------------------------------------------------------------
-  DATA:cl_dingtalk TYPE REF TO zcl_dingtalk.
   DATA:carddata LIKE zcl_dingtalk=>lt_kv.
   DATA:rtype TYPE bapi_mtype,
        rtmsg TYPE bapi_msg,
