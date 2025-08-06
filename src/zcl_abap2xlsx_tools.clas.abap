@@ -5,55 +5,62 @@ class ZCL_ABAP2XLSX_TOOLS definition
 
 public section.
 
-  methods DOWNLOAD
+  types:
+    BEGIN OF ty_excel,
+        excel_tabdref   TYPE REF TO data,
+        excel_fieldcat  TYPE zexcel_t_fieldcatalog,
+        excel_sheetname TYPE zexcel_sheet_title,
+      END OF ty_excel .
+
+  class-data:
+    exceltab  TYPE TABLE OF ty_excel .
+  class-data XDATA type XSTRING .
+
+  class-methods DOWNLOAD
     importing
-      value(TAB) type ANY TABLE optional
       value(LO_EXCEL) type ref to ZCL_EXCEL optional
       value(IV_WRITERCLASS_NAME) type CLIKE optional
       value(IV_INFO_MESSAGE) type ABAP_BOOL default ABAP_TRUE
-      !GC_SAVE_FILE_NAME type STRING
+      value(GC_SAVE_FILE_NAME) type STRING optional
       value(METHOD) type CHAR20 default 'DOWNLOAD_FRONTEND'
-    changing
-      value(LT_FIELD_CATALOG) type ZEXCEL_T_FIELDCATALOG optional
+      value(T_EXCELTAB) like EXCELTAB optional
     raising
       ZCX_EXCEL .
-  methods UPLOAD
+  class-methods UPLOAD
     exporting
       value(TAB) type ANY TABLE
       value(DREF) type ref to DATA
     raising
       ZCX_EXCEL .
+  class-methods LOAD_SMW0
+    importing
+      !IV_W3OBJID type W3OBJID
+    exporting
+      !RO_EXCEL type ref to ZCL_EXCEL
+    raising
+      ZCX_EXCEL .
   PROTECTED SECTION.
 private section.
 
-  types:
-    BEGIN OF ty_excel,
-          excel_tab      TYPE REF TO data,
-          excel_fieldcat TYPE zexcel_t_fieldcatalog,
-        END OF ty_excel .
+  class-data PATH type STRING .
+  class-data SAVE_FILE_NAME type STRING .
+  class-data T_RAWDATA type SOLIX_TAB .
+  class-data BYTECOUNT type I .
 
-  data PATH type STRING .
-  data GC_SAVE_FILE_NAME type STRING .
-  data XDATA type XSTRING .
-  data T_RAWDATA type SOLIX_TAB .
-  data BYTECOUNT type I .
-  data:
-    exceltab TYPE TABLE OF ty_excel .
-
-  methods F4_FOLDER
-    returning
-      value(SELECTED_FOLDER) type STRING
-    exceptions
-      PATH_ERROR .
-  methods F4_FILE
+  class-methods F4_FILE
     returning
       value(SELECTED_FILE) type STRING
     exceptions
       PATH_ERROR .
-  methods DOWNLOAD_FRONTEND
+  class-methods F4_FOLDER
+    returning
+      value(SELECTED_FOLDER) type STRING
+    exceptions
+      PATH_ERROR .
+  class-methods DOWNLOAD_FRONTEND
     raising
       ZCX_EXCEL .
-  methods DISPLAY_ONLINE .
+  class-methods DISPLAY_ONLINE .
 ENDCLASS.
 
 
@@ -81,45 +88,88 @@ CLASS ZCL_ABAP2XLSX_TOOLS IMPLEMENTATION.
           " Creates active sheet
           CREATE OBJECT lo_excel.
 
-          " Get active sheet
-          lo_worksheet = lo_excel->get_active_worksheet( ).
-          lo_worksheet->set_title( 'Internal table' ).
-          IF lt_field_catalog IS INITIAL.
-            lt_field_catalog = zcl_excel_common=>get_fieldcatalog( ip_table = tab ).
-          ENDIF.
-          ls_table_settings-table_style  = zcl_excel_table=>builtinstyle_medium5.
+**          " Get active sheet
+**          lo_worksheet = lo_excel->get_active_worksheet( ).
+**          lo_worksheet->set_title( 'Internal table' ).
+**          IF lt_field_catalog IS INITIAL.
+**            lt_field_catalog = zcl_excel_common=>get_fieldcatalog( ip_table = tab ).
+**          ENDIF.
+**          ls_table_settings-table_style  = zcl_excel_table=>builtinstyle_medium5.
+**
+**          lo_worksheet->bind_table( ip_table          = tab
+**                                    is_table_settings = ls_table_settings
+**                                    it_field_catalog  = lt_field_catalog ).
+**          "自动列宽
+**          lv_count = 1.
+**          LOOP AT lt_field_catalog INTO DATA(ls_field_catalog) WHERE dynpfld = 'X'.
+**            zcl_excel_common=>convert_column2alpha(
+**              EXPORTING
+**                ip_column = lv_count
+**              RECEIVING
+**                ep_column = l_col
+**            ).
+**
+**            DATA(lo_column) = lo_worksheet->get_column( l_col ).
+**            lo_column->set_auto_size( ip_auto_size = abap_true ).
+**            ADD 1 TO lv_count.
+**          ENDLOOP.
+**          lo_worksheet->calculate_column_widths( ).
+          LOOP AT t_exceltab ASSIGNING FIELD-SYMBOL(<gt_exceltab>).
+            CLEAR:lo_worksheet,ls_table_settings.
 
-          lo_worksheet->bind_table( ip_table          = tab
-                                    is_table_settings = ls_table_settings
-                                    it_field_catalog  = lt_field_catalog ).
-          "自动列宽
-          lv_count = 1.
-          LOOP AT lt_field_catalog INTO DATA(ls_field_catalog) WHERE dynpfld = 'X'.
-            zcl_excel_common=>convert_column2alpha(
-              EXPORTING
-                ip_column = lv_count
-              RECEIVING
-                ep_column = l_col
-            ).
+            IF sy-tabix = 1.
+              " Get active sheet
+              lo_worksheet = lo_excel->get_active_worksheet( ).
+            ELSE.
+              " Add another table
+              lo_worksheet = lo_excel->add_new_worksheet( ).
+            ENDIF.
+            IF <gt_exceltab>-excel_sheetname IS INITIAL.
+              lo_worksheet->set_title( 'Internal table' ).
+            ELSE.
+              lo_worksheet->set_title( <gt_exceltab>-excel_sheetname ).
+            ENDIF.
 
-            DATA(lo_column) = lo_worksheet->get_column( l_col ).
-            lo_column->set_auto_size( ip_auto_size = abap_true ).
-            ADD 1 TO lv_count.
+            ls_table_settings-table_style  = zcl_excel_table=>builtinstyle_medium5.
+            ASSIGN <gt_exceltab>-excel_tabdref->* TO FIELD-SYMBOL(<tab>).
+            IF <tab> IS ASSIGNED.
+              lo_worksheet->bind_table( ip_table          = <tab>
+                                        is_table_settings = ls_table_settings
+                                        it_field_catalog  = <gt_exceltab>-excel_fieldcat ).
+              IF <gt_exceltab>-excel_fieldcat IS INITIAL.
+                <gt_exceltab>-excel_fieldcat = zcl_excel_common=>get_fieldcatalog( ip_table = <tab> ).
+              ENDIF.
+            ENDIF.
+
+            "自动列宽
+            lv_count = 1.
+            LOOP AT <gt_exceltab>-excel_fieldcat INTO DATA(ls_field_catalog) WHERE dynpfld = 'X'.
+              zcl_excel_common=>convert_column2alpha(
+                EXPORTING
+                  ip_column = lv_count
+                RECEIVING
+                  ep_column = l_col
+              ).
+              DATA(lo_column) = lo_worksheet->get_column( l_col ).
+              lo_column->set_auto_size( ip_auto_size = abap_true ).
+              ADD 1 TO lv_count.
+            ENDLOOP.
+            lo_worksheet->calculate_column_widths( ).
+            UNASSIGN <tab>.
           ENDLOOP.
-          lo_worksheet->calculate_column_widths( ).
         ENDIF.
-        me->xdata = cl_writer->write_file( lo_excel ).
-        me->t_rawdata = cl_bcs_convert=>xstring_to_solix( iv_xstring  = me->xdata ).
-        me->bytecount = xstrlen( me->xdata ).
+        xdata = cl_writer->write_file( lo_excel ).
+        t_rawdata = cl_bcs_convert=>xstring_to_solix( iv_xstring  = xdata ).
+        bytecount = xstrlen( xdata ).
 
         CASE to_lower( method ).
 *          WHEN rb_down.
           WHEN 'download_frontend'.
             IF sy-batch IS INITIAL.
               " 选择要保存的文件路径  04.05.2024 10:16:47 by kkw
-              CALL METHOD me->f4_folder
+              CALL METHOD f4_folder
                 RECEIVING
-                  selected_folder = me->path
+                  selected_folder = path
                 EXCEPTIONS
                   path_error      = 1
                   OTHERS          = 2.
@@ -127,8 +177,8 @@ CLASS ZCL_ABAP2XLSX_TOOLS IMPLEMENTATION.
                 MESSAGE s000(oo) WITH '请选择要保存的路径'.
                 RETURN.
               ENDIF.
-              me->gc_save_file_name = gc_save_file_name.
-              me->download_frontend( ).
+              save_file_name = gc_save_file_name.
+              download_frontend( ).
             ELSE.
               MESSAGE e802(zabap2xlsx).
             ENDIF.
@@ -138,7 +188,7 @@ CLASS ZCL_ABAP2XLSX_TOOLS IMPLEMENTATION.
 *
           WHEN 'display_online'.
             IF sy-batch IS INITIAL.
-              me->display_online( ).
+              display_online( ).
             ELSE.
               MESSAGE e803(zabap2xlsx).
             ENDIF.
@@ -161,9 +211,9 @@ CLASS ZCL_ABAP2XLSX_TOOLS IMPLEMENTATION.
   METHOD download_frontend.
     DATA: filename TYPE string,
           message  TYPE string.
-    CHECK me->path IS NOT INITIAL.
+    CHECK path IS NOT INITIAL.
 * I don't like p_path here - but for this include it's ok
-    filename = me->path.
+    filename = path.
 * Add trailing "\" or "/"
     IF filename CA '/'.
       REPLACE REGEX '([^/])\s*$' IN filename WITH '$1/' .
@@ -171,13 +221,13 @@ CLASS ZCL_ABAP2XLSX_TOOLS IMPLEMENTATION.
       REPLACE REGEX '([^\\])\s*$' IN filename WITH '$1\\'.
     ENDIF.
 
-    CONCATENATE filename me->gc_save_file_name '.xlsx' INTO filename.
+    CONCATENATE filename save_file_name '.xlsx' INTO filename.
 * Get trailing blank
     cl_gui_frontend_services=>gui_download(
-    EXPORTING bin_filesize = me->bytecount
+    EXPORTING bin_filesize = bytecount
               filename     = filename
               filetype     = 'BIN'
-    CHANGING data_tab     = me->t_rawdata
+    CHANGING data_tab     = t_rawdata
     EXCEPTIONS
       OTHERS       = 1 ).
     IF sy-subrc <> 0.
@@ -258,10 +308,9 @@ CLASS ZCL_ABAP2XLSX_TOOLS IMPLEMENTATION.
          excel        TYPE REF TO zcl_excel,
          cl_error     TYPE REF TO zcx_excel,
          lo_worksheet TYPE REF TO zcl_excel_worksheet.
-    CLEAR me->path.
-    CALL METHOD me->f4_file
+    CALL METHOD f4_file
       RECEIVING
-        selected_file = me->path
+        selected_file = path
       EXCEPTIONS
         path_error    = 1
         OTHERS        = 2.
@@ -270,18 +319,18 @@ CLASS ZCL_ABAP2XLSX_TOOLS IMPLEMENTATION.
       RETURN.
     ENDIF.
 
-    CHECK me->path IS NOT INITIAL.
-    FIND REGEX '(\.xlsx|\.xlsm)\s*$' IN me->path SUBMATCHES lv_extension.
+    CHECK path IS NOT INITIAL.
+    FIND REGEX '(\.xlsx|\.xlsm)\s*$' IN path SUBMATCHES lv_extension.
     TRANSLATE lv_extension TO UPPER CASE.
     CASE lv_extension.
       WHEN '.XLSX'.
         CREATE OBJECT reader TYPE zcl_excel_reader_2007.
-        excel = reader->load_file( i_filename = me->path i_from_applserver = abap_false ).
+        excel = reader->load_file( i_filename = path i_from_applserver = abap_false ).
         "Use template for charts
         excel->use_template = abap_true.
       WHEN '.XLSM'.
         CREATE OBJECT reader TYPE zcl_excel_reader_xlsm.
-        excel = reader->load_file( i_filename = me->path i_from_applserver = abap_false ).
+        excel = reader->load_file( i_filename = path i_from_applserver = abap_false ).
         "Use template for charts
         excel->use_template = abap_true.
       WHEN OTHERS.
@@ -331,5 +380,61 @@ CLASS ZCL_ABAP2XLSX_TOOLS IMPLEMENTATION.
                                                      open_inplace     = 'X' ).
 
     WRITE: '.'.  " To create an output.  That way screen0 will exist
+  ENDMETHOD.
+
+
+  METHOD load_smw0.
+    DATA: lv_excel_data   TYPE xstring,
+          lt_mime         TYPE TABLE OF w3mime,
+          ls_key          TYPE wwwdatatab,
+          lv_errormessage TYPE string,
+          lv_filesize     TYPE i,
+          lv_filesizec    TYPE c LENGTH 10,
+          lo_reader       TYPE REF TO zif_excel_reader.
+
+*--------------------------------------------------------------------*
+* Read file into binary string
+*--------------------------------------------------------------------*
+
+    ls_key-relid = 'MI'.
+    ls_key-objid = iv_w3objid .
+
+    CALL FUNCTION 'WWWDATA_IMPORT'
+      EXPORTING
+        key    = ls_key
+      TABLES
+        mime   = lt_mime
+      EXCEPTIONS
+        OTHERS = 1.
+    IF sy-subrc <> 0.
+      lv_errormessage = '加载 SMW0 模板时出现问题'(004).
+      zcx_excel=>raise_text( lv_errormessage ).
+    ENDIF.
+
+    CALL FUNCTION 'WWWPARAMS_READ'
+      EXPORTING
+        relid = ls_key-relid
+        objid = ls_key-objid
+        name  = 'filesize'
+      IMPORTING
+        value = lv_filesizec.
+
+    lv_filesize = lv_filesizec.
+    CALL FUNCTION 'SCMS_BINARY_TO_XSTRING'
+      EXPORTING
+        input_length = lv_filesize
+      IMPORTING
+        buffer       = lv_excel_data
+      TABLES
+        binary_tab   = lt_mime
+      EXCEPTIONS
+        failed       = 1
+        OTHERS       = 2.
+
+*--------------------------------------------------------------------*
+* Parse Excel data into ZCL_EXCEL object from binary string
+*--------------------------------------------------------------------*
+    CREATE OBJECT lo_reader TYPE zcl_excel_reader_2007.
+    ro_excel = lo_reader->load( i_excel2007 = lv_excel_data ).
   ENDMETHOD.
 ENDCLASS.

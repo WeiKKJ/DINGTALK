@@ -59,13 +59,13 @@ FUNCTION zfm_interactivecards_send.
                   && |{ vertical_tab } 记录创建日期 { vertical_tab } 时间戳 { vertical_tab }  消息文本 { vertical_tab }{ newline }|
                   && |{ vertical_tab } :-: { vertical_tab } :-: { vertical_tab } :-: { vertical_tab }{ newline }|
                   && |{ vertical_tab } { wa_zilogdata-erdat } { vertical_tab } { wa_zilogdata-stamp } { vertical_tab } { wa_zilogdata-rtmsg } { vertical_tab }{ newline }|
-                  && |> ###### 发送自客户端{ sy-mandt },由用户{ sy-uname }触发|.
+                  && |> ###### 发送自客户端{ sy-mandt },由用户{ sy-uname }({ cl_abap_syst=>get_alias_user( ) })触发|.
 
   INSERT INITIAL LINE INTO TABLE carddata ASSIGNING <carddata>.
   <carddata>-key = 'but01_text'.
   <carddata>-value = '尝试重新运行'.
-  CASE sy-mandt.
-    WHEN '800'.
+  CASE cl_sql_demo_util=>check_prod_system( ).
+    WHEN abap_true.
       INSERT INITIAL LINE INTO TABLE carddata ASSIGNING <carddata>.
       <carddata>-key = 'hover'.
       <carddata>-value = 'SAP互动卡片'.
