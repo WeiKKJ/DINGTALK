@@ -14,7 +14,7 @@ public section.
 
   class-data:
     exceltab  TYPE TABLE OF ty_excel .
-  class-data XDATA type XSTRING .
+  class-data XDATA type XSTRING read-only .
 
   class-methods DOWNLOAD
     importing
@@ -24,6 +24,7 @@ public section.
       value(GC_SAVE_FILE_NAME) type STRING optional
       value(METHOD) type CHAR20 default 'DOWNLOAD_FRONTEND'
       value(T_EXCELTAB) like EXCELTAB optional
+      value(GC_EMAIL) type STRING optional
     raising
       ZCX_EXCEL .
   class-methods UPLOAD
@@ -46,7 +47,9 @@ private section.
   class-data SAVE_FILE_NAME type STRING .
   class-data T_RAWDATA type SOLIX_TAB .
   class-data BYTECOUNT type I .
+  class-data EMAIL type STRING .
 
+  class-methods SEND_EMAIL .
   class-methods F4_FILE
     returning
       value(SELECTED_FILE) type STRING
@@ -77,6 +80,8 @@ CLASS ZCL_ABAP2XLSX_TOOLS IMPLEMENTATION.
     DATA:ls_table_settings TYPE zexcel_s_table_settings.
     DATA:lv_count TYPE i,
          l_col    TYPE zexcel_cell_column_alpha.
+    save_file_name = gc_save_file_name.
+    email = gc_email.
     TRY.
 
         IF iv_writerclass_name IS INITIAL.
@@ -161,7 +166,6 @@ CLASS ZCL_ABAP2XLSX_TOOLS IMPLEMENTATION.
         xdata = cl_writer->write_file( lo_excel ).
         t_rawdata = cl_bcs_convert=>xstring_to_solix( iv_xstring  = xdata ).
         bytecount = xstrlen( xdata ).
-
         CASE to_lower( method ).
 *          WHEN rb_down.
           WHEN 'download_frontend'.
@@ -177,7 +181,7 @@ CLASS ZCL_ABAP2XLSX_TOOLS IMPLEMENTATION.
                 MESSAGE s000(oo) WITH '请选择要保存的路径'.
                 RETURN.
               ENDIF.
-              save_file_name = gc_save_file_name.
+
               download_frontend( ).
             ELSE.
               MESSAGE e802(zabap2xlsx).
@@ -196,6 +200,9 @@ CLASS ZCL_ABAP2XLSX_TOOLS IMPLEMENTATION.
 *          WHEN rb_send.
 *            cl_output->send_email( ).
 *
+          WHEN 'send_email'.
+
+            send_email( ).
         ENDCASE.
 
       CATCH zcx_excel INTO cl_error.
@@ -436,5 +443,82 @@ CLASS ZCL_ABAP2XLSX_TOOLS IMPLEMENTATION.
 *--------------------------------------------------------------------*
     CREATE OBJECT lo_reader TYPE zcl_excel_reader_2007.
     ro_excel = lo_reader->load( i_excel2007 = lv_excel_data ).
+  ENDMETHOD.
+
+
+  METHOD send_email.
+* Needed to send emails
+    DATA: bcs_exception        TYPE REF TO cx_bcs,
+          errortext            TYPE string,
+          cl_send_request      TYPE REF TO cl_bcs,
+          cl_document          TYPE REF TO cl_document_bcs,
+          cl_recipient         TYPE REF TO if_recipient_bcs,
+          cl_sender            TYPE REF TO cl_cam_address_bcs,
+          t_attachment_header  TYPE soli_tab,
+          wa_attachment_header LIKE LINE OF t_attachment_header,
+          attachment_subject   TYPE sood-objdes,
+
+          sood_bytecount       TYPE sood-objlen,
+          mail_title           TYPE so_obj_des,
+          t_mailtext           TYPE soli_tab,
+          wa_mailtext          LIKE LINE OF t_mailtext,
+          send_to              TYPE adr6-smtp_addr,
+          sent                 TYPE abap_bool.
+
+
+    mail_title     = 'Mail title'.
+    wa_mailtext    = 'Mailtext'.
+    APPEND wa_mailtext TO t_mailtext.
+
+    TRY.
+* Create send request
+        cl_send_request = cl_bcs=>create_persistent( ).
+* Create new document with mailtitle and mailtextg
+        cl_document = cl_document_bcs=>create_document( i_type    = 'RAW' "#EC NOTEXT
+                                                        i_text    = t_mailtext
+                                                        i_subject = mail_title ).
+* Add attachment to document
+* since the new excelfiles have an 4-character extension .xlsx but the attachment-type only holds 3 charactes .xls,
+* we have to specify the real filename via attachment header
+* Use attachment_type xls to have SAP display attachment with the excel-icon
+        attachment_subject  = save_file_name.
+        CONCATENATE '&SO_FILENAME=' attachment_subject INTO wa_attachment_header.
+        APPEND wa_attachment_header TO t_attachment_header.
+* Attachment
+        sood_bytecount = bytecount.  " next method expects sood_bytecount instead of any positive integer *sigh*
+        cl_document->add_attachment(  i_attachment_type    = 'XLS' "#EC NOTEXT
+                                      i_attachment_subject = attachment_subject
+                                      i_attachment_size    = sood_bytecount
+                                      i_att_content_hex    = t_rawdata
+                                      i_attachment_header  = t_attachment_header ).
+
+* add document to send request
+        cl_send_request->set_document( cl_document ).
+
+* add recipient(s) - here only 1 will be needed
+        send_to = email.
+        IF send_to IS INITIAL.
+          send_to = 'no_email@no_email.no_email'.  " Place into SOST in any case for demonstration purposes
+        ENDIF.
+        cl_recipient = cl_cam_address_bcs=>create_internet_address( send_to ).
+        cl_send_request->add_recipient( cl_recipient ).
+
+* Und abschicken
+        sent = cl_send_request->send( i_with_error_screen = 'X' ).
+
+        COMMIT WORK.
+
+        IF sent = abap_true.
+          MESSAGE s805(zabap2xlsx).
+          MESSAGE 'Document ready to be sent - Check SOST or SCOT' TYPE 'S'.
+        ELSE.
+          MESSAGE e804(zabap2xlsx) WITH email.
+        ENDIF.
+
+      CATCH cx_bcs INTO bcs_exception.
+        errortext = bcs_exception->if_message~get_text( ).
+        MESSAGE errortext TYPE 'E'.
+
+    ENDTRY.
   ENDMETHOD.
 ENDCLASS.
