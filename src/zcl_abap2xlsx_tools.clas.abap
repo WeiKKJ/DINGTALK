@@ -25,6 +25,8 @@ public section.
       value(METHOD) type CHAR20 default 'DOWNLOAD_FRONTEND'
       value(T_EXCELTAB) like EXCELTAB optional
       value(GC_EMAIL) type STRING optional
+      value(PATH) type STRING optional
+      value(TABLE_STYLE) type ZEXCEL_TABLE_STYLE default ZCL_EXCEL_TABLE=>BUILTINSTYLE_MEDIUM5
     raising
       ZCX_EXCEL .
   class-methods UPLOAD
@@ -80,6 +82,7 @@ CLASS ZCL_ABAP2XLSX_TOOLS IMPLEMENTATION.
     DATA:ls_table_settings TYPE zexcel_s_table_settings.
     DATA:lv_count TYPE i,
          l_col    TYPE zexcel_cell_column_alpha.
+    FIELD-SYMBOLS <tab> TYPE ANY TABLE.
     save_file_name = gc_save_file_name.
     email = gc_email.
     TRY.
@@ -92,33 +95,15 @@ CLASS ZCL_ABAP2XLSX_TOOLS IMPLEMENTATION.
         IF lo_excel IS NOT BOUND.
           " Creates active sheet
           CREATE OBJECT lo_excel.
-
-**          " Get active sheet
-**          lo_worksheet = lo_excel->get_active_worksheet( ).
-**          lo_worksheet->set_title( 'Internal table' ).
-**          IF lt_field_catalog IS INITIAL.
-**            lt_field_catalog = zcl_excel_common=>get_fieldcatalog( ip_table = tab ).
-**          ENDIF.
-**          ls_table_settings-table_style  = zcl_excel_table=>builtinstyle_medium5.
-**
-**          lo_worksheet->bind_table( ip_table          = tab
-**                                    is_table_settings = ls_table_settings
-**                                    it_field_catalog  = lt_field_catalog ).
-**          "自动列宽
-**          lv_count = 1.
-**          LOOP AT lt_field_catalog INTO DATA(ls_field_catalog) WHERE dynpfld = 'X'.
-**            zcl_excel_common=>convert_column2alpha(
-**              EXPORTING
-**                ip_column = lv_count
-**              RECEIVING
-**                ep_column = l_col
-**            ).
-**
-**            DATA(lo_column) = lo_worksheet->get_column( l_col ).
-**            lo_column->set_auto_size( ip_auto_size = abap_true ).
-**            ADD 1 TO lv_count.
-**          ENDLOOP.
-**          lo_worksheet->calculate_column_widths( ).
+          "Excel文本格式
+          DATA(lo_text_style) = lo_excel->add_new_style( ).
+          lo_text_style->number_format->format_code = zcl_excel_style_number_format=>c_format_text.
+          " 数字3位小数
+          DATA(lo_number_style3) = lo_excel->add_new_style( ).
+          lo_number_style3->number_format->format_code = '0.000'.
+          " 数字2位小数
+          DATA(lo_number_style2) = lo_excel->add_new_style( ).
+          lo_number_style2->number_format->format_code = '0.00'.
           LOOP AT t_exceltab ASSIGNING FIELD-SYMBOL(<gt_exceltab>).
             CLEAR:lo_worksheet,ls_table_settings.
 
@@ -135,8 +120,9 @@ CLASS ZCL_ABAP2XLSX_TOOLS IMPLEMENTATION.
               lo_worksheet->set_title( <gt_exceltab>-excel_sheetname ).
             ENDIF.
 
-            ls_table_settings-table_style  = zcl_excel_table=>builtinstyle_medium5.
-            ASSIGN <gt_exceltab>-excel_tabdref->* TO FIELD-SYMBOL(<tab>).
+            ls_table_settings-table_style  = table_style.
+            UNASSIGN <tab>.
+            ASSIGN <gt_exceltab>-excel_tabdref->* TO <tab>.
             IF <tab> IS ASSIGNED.
               lo_worksheet->bind_table( ip_table          = <tab>
                                         is_table_settings = ls_table_settings
@@ -145,7 +131,16 @@ CLASS ZCL_ABAP2XLSX_TOOLS IMPLEMENTATION.
                 <gt_exceltab>-excel_fieldcat = zcl_excel_common=>get_fieldcatalog( ip_table = <tab> ).
               ENDIF.
             ENDIF.
-
+            TRY.
+                DATA(compdescr_table) = CAST cl_abap_structdescr(
+                CAST cl_abap_tabledescr(
+                cl_abap_tabledescr=>describe_by_data( <tab> )
+                )->get_table_line_type( )
+                )->components.
+                SORT compdescr_table BY name.
+              CATCH cx_root INTO DATA(exc).
+                DATA(errtext) = exc->get_text( ).
+            ENDTRY.
             "自动列宽
             lv_count = 1.
             LOOP AT <gt_exceltab>-excel_fieldcat INTO DATA(ls_field_catalog) WHERE dynpfld = 'X'.
@@ -158,9 +153,33 @@ CLASS ZCL_ABAP2XLSX_TOOLS IMPLEMENTATION.
               DATA(lo_column) = lo_worksheet->get_column( l_col ).
               lo_column->set_auto_size( ip_auto_size = abap_true ).
               ADD 1 TO lv_count.
+              CASE ls_field_catalog-abap_type.
+                WHEN 'C' OR 'g'.
+                  lo_worksheet->set_area_style(
+                    ip_range = |{ l_col }2:{ l_col }{ lines( <tab> ) + 1 }|
+                    ip_style = lo_text_style
+                  ).
+                WHEN 'P'.
+                  READ TABLE compdescr_table INTO DATA(wcom) WITH KEY name = ls_field_catalog-fieldname BINARY SEARCH.
+                  IF sy-subrc EQ 0.
+                    CASE wcom-decimals.
+                      WHEN 2.
+                        lo_worksheet->set_area_style(
+                          ip_range = |{ l_col }2:{ l_col }{ lines( <tab> ) + 1 }|
+                          ip_style = lo_number_style2
+                        ).
+                      WHEN 3.
+                        lo_worksheet->set_area_style(
+                          ip_range = |{ l_col }2:{ l_col }{ lines( <tab> ) + 1 }|
+                          ip_style = lo_number_style3
+                        ).
+                    ENDCASE.
+                  ENDIF.
+              ENDCASE.
             ENDLOOP.
             lo_worksheet->calculate_column_widths( ).
             UNASSIGN <tab>.
+            CLEAR compdescr_table.
           ENDLOOP.
         ENDIF.
         xdata = cl_writer->write_file( lo_excel ).
@@ -170,18 +189,21 @@ CLASS ZCL_ABAP2XLSX_TOOLS IMPLEMENTATION.
 *          WHEN rb_down.
           WHEN 'download_frontend'.
             IF sy-batch IS INITIAL.
-              " 选择要保存的文件路径  04.05.2024 10:16:47 by kkw
-              CALL METHOD f4_folder
-                RECEIVING
-                  selected_folder = path
-                EXCEPTIONS
-                  path_error      = 1
-                  OTHERS          = 2.
-              IF sy-subrc <> 0.
-                MESSAGE s000(oo) WITH '请选择要保存的路径'.
-                RETURN.
+              IF path IS INITIAL.
+                " 选择要保存的文件路径  04.05.2024 10:16:47 by kkw
+                CALL METHOD f4_folder
+                  RECEIVING
+                    selected_folder = zcl_abap2xlsx_tools=>path
+                  EXCEPTIONS
+                    path_error      = 1
+                    OTHERS          = 2.
+                IF sy-subrc <> 0.
+                  MESSAGE s000(oo) WITH '请选择要保存的路径'.
+                  RETURN.
+                ENDIF.
+              ELSE.
+                zcl_abap2xlsx_tools=>path = path.
               ENDIF.
-
               download_frontend( ).
             ELSE.
               MESSAGE e802(zabap2xlsx).
@@ -227,8 +249,11 @@ CLASS ZCL_ABAP2XLSX_TOOLS IMPLEMENTATION.
     ELSE.
       REPLACE REGEX '([^\\])\s*$' IN filename WITH '$1\\'.
     ENDIF.
-
-    CONCATENATE filename save_file_name '.xlsx' INTO filename.
+    IF to_lower( save_file_name ) CP '*.xlsx'.
+      CONCATENATE filename save_file_name INTO filename.
+    ELSE.
+      CONCATENATE filename save_file_name '.xlsx' INTO filename.
+    ENDIF.
 * Get trailing blank
     cl_gui_frontend_services=>gui_download(
     EXPORTING bin_filesize = bytecount

@@ -230,6 +230,7 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
         proxy_host         = proxy_host
         proxy_user         = proxy_user
         proxy_passwd       = proxy_passwd
+*        ssl_id             = 'ANONYM'
       IMPORTING
         client             = http_object
       EXCEPTIONS
@@ -272,11 +273,13 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
           password = password.
     ENDIF.
 
-    CASE bodytype.
+    CASE to_upper( bodytype ).
       WHEN 'JSON'.
         http_object->request->set_header_field( name = 'Content-Type' value = 'application/json;charset=utf-8' ).
       WHEN 'FORM-DATA'.
         http_object->request->set_header_field( name = 'Content-Type' value = 'multipart/form-data' ).
+      WHEN 'X-WWW-FORM-URLENCODED'.
+        http_object->request->set_header_field( name = 'Content-Type' value = 'application/x-www-form-urlencoded' ).
     ENDCASE.
 
 *设置头部数据
@@ -380,6 +383,8 @@ CLASS ZCL_DINGTALK IMPLEMENTATION.
           WHEN OTHERS.
             http_object->request->set_header_field( name = name value = value ).
         ENDCASE.
+      ELSE.
+        http_object->request->set_header_field( name = name value = value ).
       ENDIF.
       UNASSIGN:<fs_name>,<fs_value>,<fs_cdata>,<fs_xdata>.
     ENDLOOP.
