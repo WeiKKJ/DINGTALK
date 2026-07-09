@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<abapGit version="v1.0.0" serializer="LCL_OBJECT_SUSH" serializer_version="v1.0.0">
+ <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
+  <asx:values>
+   <HEAD>
+    <NAME>ZFM_CORPCONVERSATION_SEND</NAME>
+    <TYPE>RF</TYPE>
+    <DISPLAY_NAME>ZFM_CORPCONVERSATION_SEND</DISPLAY_NAME>
+    <STEXT>钉钉发送工作通知</STEXT>
+   </HEAD>
+   <USOBX>
+    <USOBX>
+     <NAME>ZFM_CORPCONVERSATION_SEND</NAME>
+     <TYPE>RF</TYPE>
+     <OBJECT>S_RFC</OBJECT>
+     <OKFLAG>X</OKFLAG>
+    </USOBX>
+   </USOBX>
+  </asx:values>
+ </asx:abap>
+</abapGit>

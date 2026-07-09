@@ -650,8 +650,8 @@ FORM robot_groupmessages_send .
       msgparam           = str
 *     msgkey             = `sampleText`
       msgkey             = `sampleMarkdown`
-      openconversationid = `cidXYPRNjWm2X5bxoE65dGyig==`
-      robotcode          = `dinge9jdnvholvqayvgc`
+      openconversationid = `cidYY9xhEsgs3fD99Ua5/jJdg==`
+      robotcode          = `dinghgjwiobnmhlkvrvx`
     IMPORTING
       rtype              = rtype
       rtmsg              = rtmsg.
